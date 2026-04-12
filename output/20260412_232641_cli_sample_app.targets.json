@@ -1,0 +1,10 @@
+{
+  "functions": [
+    "worker"
+  ],
+  "files": [],
+  "lines": [],
+  "thread_names": [
+    "CLI-Worker"
+  ]
+}

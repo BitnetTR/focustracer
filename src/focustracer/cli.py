@@ -871,11 +871,14 @@ def _execute_trace_with_manifest(
     patcher.unpatch_all()
 
     if not args.skip_validate:
-        from validate import validate_trace_xml
+        from focustracer.validate.validator import validate_xml_against_xsd
 
-        valid = validate_trace_xml(str(trace_path))
-        print(f"[*] XML validation: {'ok' if valid else 'failed'}")
-        if not valid:
+        is_valid, errors = validate_xml_against_xsd(str(trace_path))
+        print(f"[*] XML validation: {'ok' if is_valid else 'failed'}")
+        if not is_valid:
+            print("[!] Validation errors:", file=sys.stderr)
+            for err in errors:
+                print(f"  - {err}", file=sys.stderr)
             return 1
 
     print(f"[*] Trace written to {trace_path}")

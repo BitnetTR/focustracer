@@ -1,0 +1,15 @@
+<?xml version="1.0" ?>
+<trace schema_version="2.1">
+  <metadata>
+    <python_version>3.11.7 (tags/v3.11.7:fa7a6f2, Dec  4 2023, 19:24:49) [MSC v.1937 64 bit (AMD64)]</python_version>
+    <platform>win32</platform>
+    <start_time>2026-04-12T23:17:17.040508+03:00</start_time>
+    <end_time>2026-04-12T23:17:17.045062+03:00</end_time>
+    <schema_version>2.1</schema_version>
+    <statistics>
+      <total_events>0</total_events>
+      <total_duration>0.004554</total_duration>
+    </statistics>
+  </metadata>
+  <events/>
+</trace>
