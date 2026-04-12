@@ -1,0 +1,65 @@
+<?xml version="1.0" ?>
+<trace schema_version="2.0">
+  <metadata>
+    <python_version>3.11.7 (tags/v3.11.7:fa7a6f2, Dec  4 2023, 19:24:49) [MSC v.1937 64 bit (AMD64)]</python_version>
+    <platform>win32</platform>
+    <start_time>2026-04-06T00:54:20.047358</start_time>
+    <end_time>2026-04-06T00:54:20.048357</end_time>
+    <schema_version>2.0</schema_version>
+    <statistics>
+      <total_events>5</total_events>
+      <total_duration>0.0009992122650146484</total_duration>
+      <call_count>1</call_count>
+      <line_count>2</line_count>
+      <exception_count>1</exception_count>
+      <return_count>1</return_count>
+    </statistics>
+  </metadata>
+  <events>
+    <scope function="my_divide" file="E:\Kodlar\AI4SWeng\trace4ai\tests\test_hook_exceptions.py" call_line="10" depth="0">
+      <arguments>
+        <arg name="a" type="int">20</arg>
+        <arg name="b" type="int">0</arg>
+      </arguments>
+      <event id="2" type="line" timestamp="1775426060.048357">
+        <line>12</line>
+        <source>x = a + 5</source>
+        <delta>
+          <change name="a" action="added" type="int">
+            <new>20</new>
+          </change>
+          <change name="b" action="added" type="int">
+            <new>0</new>
+          </change>
+        </delta>
+      </event>
+      <event id="3" type="line" timestamp="1775426060.048357">
+        <line>14</line>
+        <source>y = x / b</source>
+        <delta>
+          <change name="x" action="added" type="int">
+            <new>25</new>
+          </change>
+        </delta>
+      </event>
+      <exception>
+        <type>ZeroDivisionError</type>
+        <value>division by zero</value>
+      </exception>
+    </scope>
+    <event id="5" type="return" timestamp="1775426060.048357" depth="1">
+      <thread_id>0</thread_id>
+      <file>E:\Kodlar\AI4SWeng\trace4ai\tests\test_hook_exceptions.py</file>
+      <function>my_divide</function>
+      <line>14</line>
+      <source>y = x / b</source>
+      <caller>my_divide</caller>
+      <locals>
+        <var name="a" type="int">20</var>
+        <var name="b" type="int">0</var>
+        <var name="x" type="int">25</var>
+      </locals>
+      <return_value name="return" type="NoneType">None</return_value>
+    </event>
+  </events>
+</trace>

@@ -1,0 +1,801 @@
+Metadata-Version: 2.4
+Name: focustracer
+Version: 0.1.0
+Summary: Zero-touch dynamic program slicing and execution tracing for AI-assisted debugging
+Author-email: AI4SWEng Team <yasin@bitnet.com>
+License: MIT
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Developers
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: requests>=2.28.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Requires-Dist: pytest-cov>=4.0.0; extra == "dev"
+Requires-Dist: black>=23.0.0; extra == "dev"
+Requires-Dist: mypy>=1.0.0; extra == "dev"
+
+# Python Trace Recorder - Detaylı Dokümantasyon
+
+---
+
+## İçindekiler
+1. [Genel Bakış](#genel-bakış)
+2. [Trace Nedir?](#trace-nedir)
+3. [Kurulum ve Başlangıç](#kurulum-ve-başlangıç)
+4. [Kullanım Şekilleri](#kullanım-şekilleri)
+5. [XML Şeması Açıklaması](#xml-şeması-açıklaması)
+6. [Özellikler ve Parametreler](#özellikler-ve-parametreler)
+7. [MongoDB Entegrasyonu](#mongodb-entegrasyonu)
+8. [Örnek Senaryolar](#örnek-senaryolar)
+9. [Sorun Giderme](#sorun-giderme)
+10. [Teknik İpuçları](/TECHNICAL.md)
+---
+
+## Yol Haritası 
+
+Son durumda planı ve tamamlananları görmek için [TASK](docs/TASK.md) dosyasına bakabilirsiniz.
+
+## Genel Bakış
+
+Bu proje, Python programlarının çalışma zamanında attığı adımları kaydeden (trace) bir araç sağlar. Program çalışırken hangi fonksiyonların çağrıldığını, hangi satırların çalıştırıldığını, değişkenlerin değerlerini ve daha fazlasını XML formatında kaydeder.
+
+### Proje Dosyaları
+```
+AI4SWeng/
+├── TraceRecorder.py           # Ana trace recorder implementasyonu
+├── schema/
+│   ├── trace_schema.xsd      # XML şema tanımı
+│   └── trace_schema.json     # JSON şema tanımı
+├── tests/                    # Test dosyaları
+│   ├── simple_test.py
+│   ├── medium_test.py
+│   ├── threading_test.py
+│   └── error_valuerror.py    # Bug test case
+├── test_mongodb.py           # MongoDB test script
+├── run_code.py               # Test runner
+├── .env                      # MongoDB connection settings
+├── requirements.txt          # Python dependencies
+├── README.md                 # Bu dosya
+├── MONGODB_USAGE.md          # MongoDB kullanım kılavuzu
+├── USAGE_GUIDE.md            # Detaylı kullanım kılavuzu
+└── TASK.md                   # Proje görevleri
+```
+
+---
+
+## Trace Nedir?
+
+**Trace (İzleme)**, bir programın çalışması sırasında hangi işlemleri yaptığının kayıt altına alınmasıdır.
+
+### Trace'de Kaydedilen Bilgiler:
+
+1. **Fonksiyon Çağrıları (Call Events)**
+   - Hangi fonksiyon çağrıldı?
+   - Ne zaman çağrıldı?
+   - Hangi parametrelerle çağrıldı?
+   
+2. **Satır Çalıştırmaları (Line Events)**
+   - Hangi kod satırı çalıştı?
+   - O anda değişkenlerin değerleri neydi?
+   
+3. **Fonksiyon Dönüşleri (Return Events)**
+   - Fonksiyon ne döndürdü?
+   - Ne zaman tamamlandı?
+   
+4. **Exception'lar (Exception Events)**
+   - Hangi hata oluştu?
+   - Nerede oluştu?
+
+### Neden Trace Kullanırız?
+
+ **Debugging:** Programın nasıl çalıştığını anlamak  
+ **Performance Analysis:** Hangi fonksiyonların ne kadar sürdüğünü görmek  
+ **Code Understanding:** Karmaşık kodun akışını takip etmek  
+ **Testing:** Test coverage'ı analiz etmek  
+
+---
+
+## Kurulum ve Başlangıç
+
+### Gereksinimler
+
+**Python 3.7+** gereklidir. MongoDB entegrasyonu opsiyoneldir.
+
+### Kurulum Adımları
+
+1. **Repository'yi klonlayın:**
+```bash
+git clone https://github.com/Pilestin/trace4ai.git
+cd trace4ai
+```
+
+2. **Bağımlılıkları yükleyin:**
+```bash
+pip install -r requirements.txt
+```
+
+Bu şunları yükler:
+- `pymongo>=4.6.0` - MongoDB desteği (opsiyonel)
+- `python-dotenv>=1.0.0` - .env dosyası desteği
+
+3. **MongoDB'yi yapılandırın (Opsiyonel):**
+
+`.env` dosyası zaten oluşturulmuş durumda:
+```env
+MONGODB_URI=mongodb://localhost:27017/
+MONGODB_DATABASE=trace_db
+MONGODB_COLLECTION=trace_recorder
+```
+
+MongoDB kullanmayacaksanız bu adımı atlayabilirsiniz.
+
+### Hızlı Başlangıç
+
+1. **İlk trace'inizi alın:**
+```bash
+python quick_start.py
+```
+
+2. **Üretilen dosyayı inceleyin:**
+```bash
+# trace_output.json dosyası oluşturuldu
+```
+
+---
+
+##  Kullanım Şekilleri
+
+### Yöntem 1: Context Manager (Önerilen)
+
+En kolay ve güvenli yöntem. `with` bloğu kullanılır.
+
+```python
+from trace_recorder import TraceContext
+
+def my_function():
+    x = 10
+    y = 20
+    return x + y
+
+# Trace'i başlat, bitince otomatik kaydet
+with TraceContext("my_trace.xml") as tracer:
+    result = my_function()
+    print(f"Result: {result}")
+```
+
+**Avantajları:**
+- Otomatik başlatma ve durdurma
+- Hata oluşsa bile trace kaydedilir
+- Özet bilgi otomatik yazdırılır
+
+### Yöntem 2: Manuel Kontrol
+
+Daha fazla kontrol istiyorsanız.
+
+```python
+from trace_recorder import TraceRecorder
+
+# Recorder oluştur
+recorder = TraceRecorder(output_file="manual_trace.xml")
+
+# Trace'i başlat
+recorder.start()
+
+try:
+    # İzlenecek kod
+    my_function()
+finally:
+    # Trace'i durdur ve kaydet
+    recorder.stop()
+    recorder.save_to_xml()
+    recorder.print_summary()
+```
+
+### Yöntem 3: Decorator
+
+Belirli bir fonksiyonu izlemek için.
+
+```python
+from trace_recorder import trace_function
+
+@trace_function("decorated_trace.xml")
+def my_important_function(a, b):
+    result = a + b
+    return result
+
+# Fonksiyonu çağır, otomatik trace alınır
+my_important_function(5, 3)
+```
+
+---
+
+## XML Şeması Açıklaması
+
+### XML Dosyası Yapısı
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<trace>
+  <metadata>
+    <!-- Program bilgileri -->
+  </metadata>
+  <events>
+    <!-- Tüm event'ler -->
+  </events>
+</trace>
+```
+
+### 1. Metadata Bölümü
+
+Program ve trace hakkında genel bilgiler:
+
+```xml
+<metadata>
+  <python_version>3.11.0</python_version>
+  <platform>win32</platform>
+  <start_time>2026-02-08T10:30:00.123456</start_time>
+  <end_time>2026-02-08T10:30:05.654321</end_time>
+  <statistics>
+    <total_events>1250</total_events>
+    <total_duration>5.530865</total_duration>
+    <call_count>150</call_count>
+    <line_count>980</line_count>
+    <return_count>150</return_count>
+    <exception_count>0</exception_count>
+  </statistics>
+</metadata>
+```
+
+**Açıklama:**
+- `python_version`: Kullanılan Python versiyonu
+- `platform`: İşletim sistemi (win32, linux, darwin)
+- `start_time/end_time`: Trace başlangıç ve bitiş zamanı (ISO 8601 format)
+- `statistics`: Toplam istatistikler
+
+### 2. Events Bölümü
+
+Her event aşağıdaki yapıya sahiptir:
+
+```xml
+<event id="1" type="call" timestamp="1707389400.123456">
+  <thread_id>12345</thread_id>
+  <file>e:\Kodlar\AI4SWeng\simple_test.py</file>
+  <function>calculate_sum</function>
+  <line>10</line>
+  
+  <!-- Call event için: argümanlar -->
+  <arguments>
+    <arg name="a" type="int">5</arg>
+    <arg name="b" type="int">3</arg>
+  </arguments>
+  
+  <!-- Line event için: local değişkenler -->
+  <locals>
+    <var name="result" type="int">8</var>
+  </locals>
+</event>
+```
+
+### Event Tipleri
+
+#### 1. **Call Event** - Fonksiyon Çağrısı
+```xml
+<event id="1" type="call" timestamp="...">
+  <function>my_function</function>
+  <arguments>
+    <arg name="x" type="int">10</arg>
+  </arguments>
+</event>
+```
+**Ne zaman oluşur:** Bir fonksiyon çağrıldığında
+
+#### 2. **Line Event** - Satır Çalıştırma
+```xml
+<event id="2" type="line" timestamp="...">
+  <line>15</line>
+  <locals>
+    <var name="temp" type="int">20</var>
+  </locals>
+</event>
+```
+**Ne zaman oluşur:** Her kod satırı çalıştırıldığında
+
+#### 3. **Return Event** - Fonksiyon Dönüşü
+```xml
+<event id="3" type="return" timestamp="...">
+  <return_value type="int">30</return_value>
+</event>
+```
+**Ne zaman oluşur:** Fonksiyon return ettiğinde
+
+#### 4. **Exception Event** - Hata
+```xml
+<event id="4" type="exception" timestamp="...">
+  <exception>
+    <type>ValueError</type>
+    <value>invalid literal for int()</value>
+  </exception>
+</event>
+```
+**Ne zaman oluşur:** Exception fırlatıldığında
+
+---
+
+## Özellikler ve Parametreler
+
+### TraceRecorder Parametreleri
+
+```python
+TraceRecorder(
+    output_file="trace_output.xml",    # Çıktı dosyası
+    max_depth=100,                      # Maksimum call stack derinliği
+    track_variables=True,               # Değişkenleri takip et
+    track_arguments=True,               # Argümanları takip et
+    detail_level="normal",              # minimal | normal | detailed
+    output_format="xml",                # xml | json | jsonl | mongodb
+    enable_threading=False,             # Thread tracking
+    db_export=False,                    # MongoDB export
+    mongodb_uri=None,                   # MongoDB connection URI
+    mongodb_database=None,              # MongoDB database adı
+    mongodb_collection=None             # MongoDB collection adı
+)
+```
+
+#### `output_file` (str)
+- **Varsayılan:** `"trace_output.xml"`
+- **Açıklama:** Trace'in kaydedileceği dosya adı
+- **Örnek:** `"my_program_trace.json"`
+
+#### `max_depth` (int)
+- **Varsayılan:** `100`
+- **Açıklama:** Maksimum fonksiyon çağrı derinliği. Sonsuz recursive çağrılara karşı koruma.
+- **Örnek:** `max_depth=50`
+
+#### `track_variables` (bool)
+- **Varsayılan:** `True`
+- **Açıklama:** Local değişkenlerin değerlerini kaydet
+- **Not:** False yaparsanız dosya daha küçük olur ama daha az bilgi içerir
+
+#### `track_arguments` (bool)
+- **Varsayılan:** `True`
+- **Açıklama:** Fonksiyon argümanlarını kaydet
+- **Not:** False yaparsanız argüman değerleri kaydedilmez
+
+#### `detail_level` (str)
+- **Varsayılan:** `"normal"`
+- **Seçenekler:** `"minimal"` | `"normal"` | `"detailed"`
+- **Açıklama:**
+  - **minimal**: Sadece temel bilgiler (seq, etype, frame, source, depth, delta)
+  - **normal**: + timestamp, caller, args (önerilen)
+  - **detailed**: + tüm locals snapshot (çok detaylı)
+
+#### `output_format` (str)
+- **Varsayılan:** `"xml"`
+- **Seçenekler:** `"xml"` | `"json"` | `"jsonl"`
+- **Açıklama:** Dosya çıktı formatı
+  - **xml**: Structured XML format
+  - **json**: Single JSON file with metadata
+  - **jsonl**: JSON Lines (her event bir satır)
+
+#### `enable_threading` (bool)
+- **Varsayılan:** `False`
+- **Açıklama:** Multi-threaded programlar için thread ID tracking
+
+#### `db_export` (bool)
+- **Varsayılan:** `False`
+- **Açıklama:** MongoDB'ye kaydetmeyi aktif et
+- **Not:** `True` ise hem dosyaya hem MongoDB'ye kaydeder (format'tan bağımsız)
+
+#### `mongodb_uri` (str, optional)
+- **Varsayılan:** `.env`'den okunur
+- **Açıklama:** MongoDB bağlantı URI'si
+- **Örnek:** `"mongodb://localhost:27017/"`
+
+#### `mongodb_database` (str, optional)
+- **Varsayılan:** `.env`'den okunur
+- **Açıklama:** MongoDB database adı
+- **Örnek:** `"trace_db"`
+
+#### `mongodb_collection` (str, optional)
+- **Varsayılan:** `.env`'den okunur
+- **Açıklama:** MongoDB collection adı
+- **Örnek:** `"trace_recorder"`
+
+### Örnek Kullanımlar
+
+#### Minimal Trace (En küçük dosya)
+```python
+with TraceContext("minimal.json", 
+                  detail_level="minimal",
+                  output_format="json") as tracer:
+    my_function()
+```
+
+#### Normal Trace (Önerilen - Bug tespiti için)
+```python
+with TraceContext("normal.json",
+                  detail_level="normal",
+                  output_format="json") as tracer:
+    buggy_function()
+```
+
+#### Detailed Trace (Tam detay)
+```python
+with TraceContext("detailed.json",
+                  detail_level="detailed",
+                  output_format="json") as tracer:
+    complex_function()
+```
+
+#### MongoDB ile Kayıt (Hem dosya hem DB)
+```python
+with TraceContext("trace.json",
+                  detail_level="normal",
+                  output_format="json",
+                  db_export=True) as tracer:
+    my_function()
+# Sonuç: trace.json dosyası + MongoDB'ye kayıt
+```
+
+#### Sadece MongoDB'ye Kayıt (Dosya istemiyorsanız)
+```python
+# Not: Dosya yine oluşur ama asıl amaç MongoDB
+with TraceContext("temp.json",
+                  detail_level="normal",
+                  output_format="json",
+                  db_export=True) as tracer:
+    my_function()
+# İpucu: Dosyayı sonra silebilirsiniz
+```
+
+---
+
+## MongoDB Entegrasyonu
+
+TraceRecorder, trace verilerini MongoDB'ye kaydetme özelliğine sahiptir. Bu, büyük ölçekli trace analizi ve sorgulama için idealdir.
+
+### Hızlı Başlangıç
+
+1. **MongoDB'yi başlatın:**
+```bash
+# Windows
+net start MongoDB
+
+# Linux/Mac
+sudo systemctl start mongod
+```
+
+2. **Trace'i MongoDB'ye kaydedin:**
+```python
+from TraceRecorder import TraceContext
+
+with TraceContext(
+    output_file="trace.json",
+    detail_level="normal",
+    output_format="json",
+    db_export=True  # MongoDB aktif
+) as tracer:
+    my_function()
+```
+
+3. **MongoDB'de görüntüleyin:**
+```bash
+mongo
+use trace_db
+db.trace_recorder.find().pretty()
+```
+
+### MongoDB Yapılandırması
+
+`.env` dosyasında MongoDB ayarlarını yapılandırabilirsiniz:
+
+```env
+MONGODB_URI=mongodb://localhost:27017/
+MONGODB_DATABASE=trace_db
+MONGODB_COLLECTION=trace_recorder
+```
+
+### MongoDB Veri Yapısı
+
+Her trace session bir MongoDB document olarak kaydedilir:
+
+```javascript
+{
+  "_id": ObjectId("..."),
+  "created_at": ISODate("2026-02-11T10:30:00Z"),
+  "program_file": "test.py",
+  "detail_level": "normal",
+  "duration_seconds": 5.33,
+  "statistics": {
+    "total_events": 1250,
+    "event_types": {"call": 150, "line": 980, "return": 100}
+  },
+  "events": [
+    {
+      "seq": 1,
+      "etype": "call",
+      "source": "def sum_of_even(mylist):",
+      "delta": {"toplam": {"action": "changed", "old": "0", "new": "10"}}
+    }
+    // ... daha fazla event
+  ]
+}
+```
+
+### MongoDB Sorgu Örnekleri
+
+```javascript
+// Exception içeren trace'leri bul
+db.trace_recorder.find({
+  "statistics.event_types.exception": {$gt: 0}
+})
+
+// Belirli bir değişkenin değişimlerini bul
+db.trace_recorder.find({
+  "events.delta.toplam": {$exists: true}
+})
+
+// Son 24 saatteki trace'ler
+db.trace_recorder.find({
+  "created_at": {$gte: new Date(Date.now() - 86400000)}
+})
+```
+
+**Detaylı MongoDB kullanımı için:** [MONGODB_USAGE.md](MONGODB_USAGE.md)
+
+---
+
+## Örnek Senaryolar
+
+### Senaryo 1: Basit Fonksiyon Trace
+
+**Kod:**
+```python
+from trace_recorder import TraceContext
+
+def add(a, b):
+    result = a + b
+    return result
+
+with TraceContext("add_trace.xml") as tracer:
+    total = add(5, 3)
+    print(f"Total: {total}")
+```
+
+**Üretilen Trace:**
+- Event 1: `add` fonksiyonu çağrıldı (a=5, b=3)
+- Event 2: 2. satır çalıştı (result=8)
+- Event 3: `add` return etti (return_value=8)
+
+### Senaryo 2: Recursive Fonksiyon
+
+**Kod:**
+```python
+def factorial(n):
+    if n <= 1:
+        return 1
+    return n * factorial(n - 1)
+
+with TraceContext("factorial_trace.xml") as tracer:
+    result = factorial(5)
+```
+
+**Trace'de görülenler:**
+- Her recursive çağrı ayrı bir call event
+- Call stack derinliği görülebilir
+- Her return değeri kaydedilir
+
+### Senaryo 3: Exception Handling
+
+**Kod:**
+```python
+def divide(a, b):
+    try:
+        return a / b
+    except ZeroDivisionError as e:
+        print("Cannot divide by zero!")
+        return None
+
+with TraceContext("exception_trace.xml") as tracer:
+    divide(10, 0)
+```
+
+**Trace'de görülenler:**
+- Exception event kaydedilir
+- Exception tipi ve mesajı görünür
+- Exception handling akışı takip edilebilir
+
+### Senaryo 4: Multi-Threading
+
+**Kod:**
+```python
+import threading
+
+def worker(worker_id):
+    for i in range(3):
+        print(f"Worker {worker_id}: {i}")
+
+with TraceContext("threads_trace.xml") as tracer:
+    threads = [
+        threading.Thread(target=worker, args=(i,))
+        for i in range(2)
+    ]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+```
+
+**Trace'de görülenler:**
+- Her thread'in ayrı thread_id'si var
+- Thread'ler arası geçişler görülebilir
+- Her thread'in event'leri ayrı takip edilir
+
+---
+
+## Sorun Giderme
+
+### Problem: XML dosyası çok büyük
+
+**Çözüm:**
+```python
+# Değişken takibini kapat
+with TraceContext("output.xml", 
+                  track_variables=False) as tracer:
+    my_function()
+```
+
+### Problem: Program çok yavaş çalışıyor
+
+**Sebep:** Trace her satırı kaydeder, bu performansı etkiler.
+
+**Çözüm 1:** Sadece önemli bölümleri trace'leyin
+```python
+# Trace olmadan
+setup_operations()
+
+# Sadece kritik bölümü trace'le
+with TraceContext("critical.xml") as tracer:
+    critical_function()
+
+# Trace olmadan devam
+cleanup_operations()
+```
+
+**Çözüm 2:** Recursive fonksiyonlarda max_depth kullanın
+```python
+with TraceContext("output.xml", max_depth=10) as tracer:
+    recursive_function()
+```
+
+### Problem: Stack overflow hatası
+
+**Sebep:** Çok derin recursive çağrılar.
+
+**Çözüm:**
+```python
+# max_depth'i düşürün
+with TraceContext("output.xml", max_depth=20) as tracer:
+    my_recursive_function()
+```
+
+### Problem: Unicode karakterler XML'de bozuk görünüyor
+
+**Sebep:** Encoding problemi.
+
+**Çözüm:** XML dosyası UTF-8 encoding kullanıyor, doğru bir editörle açın.
+
+---
+
+## Performans İpuçları
+
+### 1. Trace Boyutunu Azaltma
+- `track_variables=False` kullanın
+- `track_arguments=False` kullanın
+- Sadece gerekli kod bölümlerini trace'leyin
+
+### 2. Trace Hızını Artırma
+- `max_depth` değerini düşürün
+- Büyük döngülerde trace'i pause/resume yapın
+
+### 3. XML Analizi
+- Büyük XML dosyaları için streaming parser kullanın
+- XPath ile spesifik event'leri arayın
+
+```python
+import xml.etree.ElementTree as ET
+
+# Sadece call event'lerini bul
+tree = ET.parse('trace_output.xml')
+for event in tree.findall(".//event[@type='call']"):
+    function = event.find('function').text
+    print(f"Called: {function}")
+```
+
+---
+
+## İleri Seviye Kullanım
+
+### Custom Filtreleme
+
+Trace sınıfını extend ederek özel filtreler ekleyebilirsiniz:
+
+```python
+class FilteredTraceRecorder(TraceRecorder):
+    def trace_function(self, frame, event, arg):
+        # Sadece kendi kodunuzu trace'le
+        filename = frame.f_code.co_filename
+        if not filename.startswith('e:\\Kodlar'):
+            return None
+        
+        return super().trace_function(frame, event, arg)
+```
+
+### Database'e Kaydetme
+
+XML yerine veya XML'e ek olarak database'e kayıt:
+
+```python
+import sqlite3
+
+class DatabaseTraceRecorder(TraceRecorder):
+    def __init__(self, db_file, **kwargs):
+        super().__init__(**kwargs)
+        self.conn = sqlite3.connect(db_file)
+        self._create_tables()
+    
+    def _create_tables(self):
+        self.conn.execute('''
+            CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY,
+                type TEXT,
+                timestamp REAL,
+                function TEXT,
+                line INTEGER
+            )
+        ''')
+```
+
+---
+
+## Özet Kontrol Listesi
+
+Trace almadan önce kontrol edin:
+
+- [ ] TraceRecorder import edildi mi?
+- [ ] Output dosyası adı belirlendi mi?
+- [ ] Trace context/decorator kullanıldı mı?
+- [ ] Performans için parametreler ayarlandı mı?
+- [ ] XML şema dosyası (trace_schema.xsd) mevcut mu?
+
+Trace alındıktan sonra:
+
+- [ ] XML dosyası oluşturuldu mu?
+- [ ] Dosya boyutu makul mü?
+- [ ] Summary bilgileri kontrol edildi mi?
+- [ ] XML şemaya uygun mu? (Validator ile test edin)
+
+---
+
+
+## Ek Kaynaklar
+
+### Python Trace Dökümanları
+- [sys.settrace() Documentation](https://docs.python.org/3/library/sys.html#sys.settrace)
+- [Python Debugging Tools](https://docs.python.org/3/library/debug.html)
+
+### XML Şema
+- [XML Schema Tutorial](https://www.w3schools.com/xml/schema_intro.asp)
+- [XSD Validation](https://www.xmlvalidation.com/)
+
+---
+
+**Son Güncelleme:** 2026-02-08  
+**Versiyon:** 1.0

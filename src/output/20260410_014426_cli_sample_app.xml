@@ -1,0 +1,227 @@
+<?xml version="1.0" ?>
+<trace schema_version="2.1">
+  <metadata>
+    <python_version>3.11.7 (tags/v3.11.7:fa7a6f2, Dec  4 2023, 19:24:49) [MSC v.1937 64 bit (AMD64)]</python_version>
+    <platform>win32</platform>
+    <start_time>2026-04-10T01:44:26.525190+03:00</start_time>
+    <end_time>2026-04-10T01:44:26.535716+03:00</end_time>
+    <schema_version>2.1</schema_version>
+    <statistics>
+      <total_events>26</total_events>
+      <total_duration>0.010526</total_duration>
+      <call_count>5</call_count>
+      <line_count>16</line_count>
+      <return_count>5</return_count>
+    </statistics>
+  </metadata>
+  <events>
+    <thread id="4220" name="CLI-Worker">
+      <scope function="worker" file="E:\Kodlar\AI4SWeng\trace4ai\tests\fixtures\cli_sample_app.py" call_line="16" depth="0">
+        <arguments>
+          <arg name="data" type="list">[1, 2, 3]</arg>
+        </arguments>
+        <event id="2" type="line" timestamp="1775774666.534711">
+          <thread_id>4220</thread_id>
+          <line>17</line>
+          <source>process(data)</source>
+          <delta>
+            <change name="data" action="added" type="list">
+              <new>[1, 2, 3]</new>
+            </change>
+          </delta>
+          <locals>
+            <var name="data" type="list">[1, 2, 3]</var>
+          </locals>
+        </event>
+        <scope function="process" file="E:\Kodlar\AI4SWeng\trace4ai\tests\fixtures\cli_sample_app.py" call_line="9" depth="1">
+          <arguments>
+            <arg name="values" type="list">[1, 2, 3]</arg>
+          </arguments>
+          <event id="4" type="line" timestamp="1775774666.534711">
+            <thread_id>4220</thread_id>
+            <line>10</line>
+            <source>output = []</source>
+            <delta>
+              <change name="values" action="added" type="list">
+                <new>[1, 2, 3]</new>
+              </change>
+            </delta>
+            <locals>
+              <var name="values" type="list">[1, 2, 3]</var>
+            </locals>
+          </event>
+          <loop line="11" source="for value in values:" iterations="3" type="for">
+            <iteration index="0">
+              <event id="6" type="line" timestamp="1775774666.534711">
+                <thread_id>4220</thread_id>
+                <line>12</line>
+                <source>output.append(multiply(value))</source>
+                <delta>
+                  <change name="value" action="added" type="int">
+                    <new>1</new>
+                  </change>
+                </delta>
+                <locals>
+                  <var name="values" type="list">[1, 2, 3]</var>
+                  <var name="output" type="list">[]</var>
+                  <var name="value" type="int">1</var>
+                </locals>
+              </event>
+              <scope function="multiply" file="E:\Kodlar\AI4SWeng\trace4ai\tests\fixtures\cli_sample_app.py" call_line="4" depth="2">
+                <arguments>
+                  <arg name="value" type="int">1</arg>
+                </arguments>
+                <event id="8" type="line" timestamp="1775774666.534711">
+                  <thread_id>4220</thread_id>
+                  <line>5</line>
+                  <source>result = value * 2</source>
+                  <delta>
+                    <change name="value" action="added" type="int">
+                      <new>1</new>
+                    </change>
+                  </delta>
+                  <locals>
+                    <var name="value" type="int">1</var>
+                  </locals>
+                </event>
+                <event id="9" type="line" timestamp="1775774666.534711">
+                  <thread_id>4220</thread_id>
+                  <line>6</line>
+                  <source>return result</source>
+                  <delta>
+                    <change name="result" action="added" type="int">
+                      <new>2</new>
+                    </change>
+                  </delta>
+                  <locals>
+                    <var name="value" type="int">1</var>
+                    <var name="result" type="int">2</var>
+                  </locals>
+                </event>
+                <return_value name="return" type="int">2</return_value>
+              </scope>
+            </iteration>
+            <iteration index="1">
+              <event id="12" type="line" timestamp="1775774666.534711">
+                <thread_id>4220</thread_id>
+                <line>12</line>
+                <source>output.append(multiply(value))</source>
+                <delta>
+                  <change name="value" action="changed" type="int">
+                    <old>1</old>
+                    <new>2</new>
+                  </change>
+                </delta>
+                <locals>
+                  <var name="values" type="list">[1, 2, 3]</var>
+                  <var name="output" type="list">[2]</var>
+                  <var name="value" type="int">2</var>
+                </locals>
+              </event>
+              <scope function="multiply" file="E:\Kodlar\AI4SWeng\trace4ai\tests\fixtures\cli_sample_app.py" call_line="4" depth="2">
+                <arguments>
+                  <arg name="value" type="int">2</arg>
+                </arguments>
+                <event id="14" type="line" timestamp="1775774666.535716">
+                  <thread_id>4220</thread_id>
+                  <line>5</line>
+                  <source>result = value * 2</source>
+                  <delta>
+                    <change name="value" action="added" type="int">
+                      <new>2</new>
+                    </change>
+                  </delta>
+                  <locals>
+                    <var name="value" type="int">2</var>
+                  </locals>
+                </event>
+                <event id="15" type="line" timestamp="1775774666.535716">
+                  <thread_id>4220</thread_id>
+                  <line>6</line>
+                  <source>return result</source>
+                  <delta>
+                    <change name="result" action="added" type="int">
+                      <new>4</new>
+                    </change>
+                  </delta>
+                  <locals>
+                    <var name="value" type="int">2</var>
+                    <var name="result" type="int">4</var>
+                  </locals>
+                </event>
+                <return_value name="return" type="int">4</return_value>
+              </scope>
+            </iteration>
+            <iteration index="2">
+              <event id="18" type="line" timestamp="1775774666.535716">
+                <thread_id>4220</thread_id>
+                <line>12</line>
+                <source>output.append(multiply(value))</source>
+                <delta>
+                  <change name="value" action="changed" type="int">
+                    <old>2</old>
+                    <new>3</new>
+                  </change>
+                </delta>
+                <locals>
+                  <var name="values" type="list">[1, 2, 3]</var>
+                  <var name="output" type="list">[2, 4]</var>
+                  <var name="value" type="int">3</var>
+                </locals>
+              </event>
+              <scope function="multiply" file="E:\Kodlar\AI4SWeng\trace4ai\tests\fixtures\cli_sample_app.py" call_line="4" depth="2">
+                <arguments>
+                  <arg name="value" type="int">3</arg>
+                </arguments>
+                <event id="20" type="line" timestamp="1775774666.535716">
+                  <thread_id>4220</thread_id>
+                  <line>5</line>
+                  <source>result = value * 2</source>
+                  <delta>
+                    <change name="value" action="added" type="int">
+                      <new>3</new>
+                    </change>
+                  </delta>
+                  <locals>
+                    <var name="value" type="int">3</var>
+                  </locals>
+                </event>
+                <event id="21" type="line" timestamp="1775774666.535716">
+                  <thread_id>4220</thread_id>
+                  <line>6</line>
+                  <source>return result</source>
+                  <delta>
+                    <change name="result" action="added" type="int">
+                      <new>6</new>
+                    </change>
+                  </delta>
+                  <locals>
+                    <var name="value" type="int">3</var>
+                    <var name="result" type="int">6</var>
+                  </locals>
+                </event>
+                <return_value name="return" type="int">6</return_value>
+              </scope>
+            </iteration>
+            <summary>
+              <variable_changes name="value" initial="1" final="3" change_count="3"/>
+              <variable_changes name="output" initial="[]" final="[2, 4, 6]" change_count="3"/>
+            </summary>
+          </loop>
+          <event id="24" type="line" timestamp="1775774666.535716">
+            <thread_id>4220</thread_id>
+            <line>13</line>
+            <source>return output</source>
+            <locals>
+              <var name="values" type="list">[1, 2, 3]</var>
+              <var name="output" type="list">[2, 4, 6]</var>
+              <var name="value" type="int">3</var>
+            </locals>
+          </event>
+          <return_value name="return" type="list">[2, 4, 6]</return_value>
+        </scope>
+        <return_value name="return" type="NoneType">None</return_value>
+      </scope>
+    </thread>
+  </events>
+</trace>

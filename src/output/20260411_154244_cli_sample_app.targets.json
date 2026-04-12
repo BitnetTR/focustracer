@@ -1,0 +1,8 @@
+{
+  "functions": [
+    "fixtures.cli_sample_app.worker"
+  ],
+  "files": [],
+  "lines": [],
+  "thread_names": []
+}

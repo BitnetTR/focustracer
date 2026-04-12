@@ -1,0 +1,22 @@
+# Python Trace Recorder - Requirements
+# =====================================
+
+# MongoDB driver
+pymongo>=4.6.0
+
+# Environment variables
+python-dotenv>=1.0.0
+
+# XML validation
+lxml>=5.0.0
+
+# Documentation generation
+jinja2>=3.1.0
+deepdiff>=6.7.0
+rich>=13.7.0
+
+# FastAPI server
+fastapi>=0.110.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+sse-starlette>=1.6.1

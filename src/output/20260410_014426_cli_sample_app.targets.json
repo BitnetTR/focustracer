@@ -1,0 +1,10 @@
+{
+  "functions": [
+    "cli_sample_app.worker"
+  ],
+  "files": [],
+  "lines": [],
+  "thread_names": [
+    "CLI-Worker"
+  ]
+}

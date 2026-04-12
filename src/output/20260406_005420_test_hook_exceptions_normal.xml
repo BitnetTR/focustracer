@@ -1,0 +1,56 @@
+<?xml version="1.0" ?>
+<trace schema_version="2.0">
+  <metadata>
+    <python_version>3.11.7 (tags/v3.11.7:fa7a6f2, Dec  4 2023, 19:24:49) [MSC v.1937 64 bit (AMD64)]</python_version>
+    <platform>win32</platform>
+    <start_time>2026-04-06T00:54:20.035477</start_time>
+    <end_time>2026-04-06T00:54:20.037477</end_time>
+    <schema_version>2.0</schema_version>
+    <statistics>
+      <total_events>5</total_events>
+      <total_duration>0.002000093460083008</total_duration>
+      <call_count>1</call_count>
+      <line_count>3</line_count>
+      <return_count>1</return_count>
+    </statistics>
+  </metadata>
+  <events>
+    <scope function="my_divide" file="E:\Kodlar\AI4SWeng\trace4ai\tests\test_hook_exceptions.py" call_line="10" depth="0">
+      <arguments>
+        <arg name="a" type="int">10</arg>
+        <arg name="b" type="int">2</arg>
+      </arguments>
+      <event id="2" type="line" timestamp="1775426060.036480">
+        <line>12</line>
+        <source>x = a + 5</source>
+        <delta>
+          <change name="a" action="added" type="int">
+            <new>10</new>
+          </change>
+          <change name="b" action="added" type="int">
+            <new>2</new>
+          </change>
+        </delta>
+      </event>
+      <event id="3" type="line" timestamp="1775426060.036480">
+        <line>14</line>
+        <source>y = x / b</source>
+        <delta>
+          <change name="x" action="added" type="int">
+            <new>15</new>
+          </change>
+        </delta>
+      </event>
+      <event id="4" type="line" timestamp="1775426060.036480">
+        <line>15</line>
+        <source>return y</source>
+        <delta>
+          <change name="y" action="added" type="float">
+            <new>7.5</new>
+          </change>
+        </delta>
+      </event>
+      <return_value name="return" type="float">7.5</return_value>
+    </scope>
+  </events>
+</trace>

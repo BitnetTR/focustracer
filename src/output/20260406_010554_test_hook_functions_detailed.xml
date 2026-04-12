@@ -1,0 +1,264 @@
+<?xml version="1.0" ?>
+<trace schema_version="2.0">
+  <metadata>
+    <python_version>3.11.7 (tags/v3.11.7:fa7a6f2, Dec  4 2023, 19:24:49) [MSC v.1937 64 bit (AMD64)]</python_version>
+    <platform>win32</platform>
+    <start_time>2026-04-06T01:05:54.861743</start_time>
+    <end_time>2026-04-06T01:05:54.863978</end_time>
+    <schema_version>2.0</schema_version>
+    <statistics>
+      <total_events>26</total_events>
+      <total_duration>0.0022351741790771484</total_duration>
+      <call_count>4</call_count>
+      <line_count>18</line_count>
+      <return_count>4</return_count>
+    </statistics>
+  </metadata>
+  <events>
+    <scope function="process_data" file="E:\Kodlar\AI4SWeng\trace4ai\tests\test_hook_functions.py" call_line="15" depth="0">
+      <arguments>
+        <arg name="data" type="list">[1, 2, 3]</arg>
+      </arguments>
+      <event id="2" type="line" timestamp="1775426754.863978">
+        <line>17</line>
+        <source>results = []</source>
+        <delta>
+          <change name="data" action="added" type="list">
+            <new>[1, 2, 3]</new>
+          </change>
+        </delta>
+        <locals>
+          <var name="data" type="list">[1, 2, 3]</var>
+        </locals>
+      </event>
+      <loop line="18" source="for item in data:" iterations="3" type="for">
+        <iteration index="0">
+          <event id="4" type="line" timestamp="1775426754.863978">
+            <line>19</line>
+            <source>val = inner_math_operation(item, 10)</source>
+            <delta>
+              <change name="item" action="added" type="int">
+                <new>1</new>
+              </change>
+            </delta>
+            <locals>
+              <var name="data" type="list">[1, 2, 3]</var>
+              <var name="results" type="list">[]</var>
+              <var name="item" type="int">1</var>
+            </locals>
+          </event>
+          <scope function="inner_math_operation" file="E:\Kodlar\AI4SWeng\trace4ai\tests\test_hook_functions.py" call_line="9" depth="1">
+            <arguments>
+              <arg name="x" type="int">1</arg>
+              <arg name="y" type="int">10</arg>
+            </arguments>
+            <event id="6" type="line" timestamp="1775426754.863978">
+              <line>12</line>
+              <source>res = x * y</source>
+              <delta>
+                <change name="x" action="added" type="int">
+                  <new>1</new>
+                </change>
+                <change name="y" action="added" type="int">
+                  <new>10</new>
+                </change>
+              </delta>
+              <locals>
+                <var name="x" type="int">1</var>
+                <var name="y" type="int">10</var>
+              </locals>
+            </event>
+            <event id="7" type="line" timestamp="1775426754.863978">
+              <line>13</line>
+              <source>return res + 2</source>
+              <delta>
+                <change name="res" action="added" type="int">
+                  <new>10</new>
+                </change>
+              </delta>
+              <locals>
+                <var name="x" type="int">1</var>
+                <var name="y" type="int">10</var>
+                <var name="res" type="int">10</var>
+              </locals>
+            </event>
+            <return_value name="return" type="int">12</return_value>
+          </scope>
+          <event id="9" type="line" timestamp="1775426754.863978">
+            <line>20</line>
+            <source>results.append(val)</source>
+            <delta>
+              <change name="val" action="added" type="int">
+                <new>12</new>
+              </change>
+            </delta>
+            <locals>
+              <var name="data" type="list">[1, 2, 3]</var>
+              <var name="results" type="list">[]</var>
+              <var name="item" type="int">1</var>
+              <var name="val" type="int">12</var>
+            </locals>
+          </event>
+        </iteration>
+        <iteration index="1">
+          <event id="11" type="line" timestamp="1775426754.863978">
+            <line>19</line>
+            <source>val = inner_math_operation(item, 10)</source>
+            <delta>
+              <change name="item" action="changed" type="int">
+                <old>1</old>
+                <new>2</new>
+              </change>
+            </delta>
+            <locals>
+              <var name="data" type="list">[1, 2, 3]</var>
+              <var name="results" type="list">[12]</var>
+              <var name="item" type="int">2</var>
+              <var name="val" type="int">12</var>
+            </locals>
+          </event>
+          <scope function="inner_math_operation" file="E:\Kodlar\AI4SWeng\trace4ai\tests\test_hook_functions.py" call_line="9" depth="1">
+            <arguments>
+              <arg name="x" type="int">2</arg>
+              <arg name="y" type="int">10</arg>
+            </arguments>
+            <event id="13" type="line" timestamp="1775426754.863978">
+              <line>12</line>
+              <source>res = x * y</source>
+              <delta>
+                <change name="x" action="added" type="int">
+                  <new>2</new>
+                </change>
+                <change name="y" action="added" type="int">
+                  <new>10</new>
+                </change>
+              </delta>
+              <locals>
+                <var name="x" type="int">2</var>
+                <var name="y" type="int">10</var>
+              </locals>
+            </event>
+            <event id="14" type="line" timestamp="1775426754.863978">
+              <line>13</line>
+              <source>return res + 2</source>
+              <delta>
+                <change name="res" action="added" type="int">
+                  <new>20</new>
+                </change>
+              </delta>
+              <locals>
+                <var name="x" type="int">2</var>
+                <var name="y" type="int">10</var>
+                <var name="res" type="int">20</var>
+              </locals>
+            </event>
+            <return_value name="return" type="int">22</return_value>
+          </scope>
+          <event id="16" type="line" timestamp="1775426754.863978">
+            <line>20</line>
+            <source>results.append(val)</source>
+            <delta>
+              <change name="val" action="changed" type="int">
+                <old>12</old>
+                <new>22</new>
+              </change>
+            </delta>
+            <locals>
+              <var name="data" type="list">[1, 2, 3]</var>
+              <var name="results" type="list">[12]</var>
+              <var name="item" type="int">2</var>
+              <var name="val" type="int">22</var>
+            </locals>
+          </event>
+        </iteration>
+        <iteration index="2">
+          <event id="18" type="line" timestamp="1775426754.863978">
+            <line>19</line>
+            <source>val = inner_math_operation(item, 10)</source>
+            <delta>
+              <change name="item" action="changed" type="int">
+                <old>2</old>
+                <new>3</new>
+              </change>
+            </delta>
+            <locals>
+              <var name="data" type="list">[1, 2, 3]</var>
+              <var name="results" type="list">[12, 22]</var>
+              <var name="item" type="int">3</var>
+              <var name="val" type="int">22</var>
+            </locals>
+          </event>
+          <scope function="inner_math_operation" file="E:\Kodlar\AI4SWeng\trace4ai\tests\test_hook_functions.py" call_line="9" depth="1">
+            <arguments>
+              <arg name="x" type="int">3</arg>
+              <arg name="y" type="int">10</arg>
+            </arguments>
+            <event id="20" type="line" timestamp="1775426754.863978">
+              <line>12</line>
+              <source>res = x * y</source>
+              <delta>
+                <change name="x" action="added" type="int">
+                  <new>3</new>
+                </change>
+                <change name="y" action="added" type="int">
+                  <new>10</new>
+                </change>
+              </delta>
+              <locals>
+                <var name="x" type="int">3</var>
+                <var name="y" type="int">10</var>
+              </locals>
+            </event>
+            <event id="21" type="line" timestamp="1775426754.863978">
+              <line>13</line>
+              <source>return res + 2</source>
+              <delta>
+                <change name="res" action="added" type="int">
+                  <new>30</new>
+                </change>
+              </delta>
+              <locals>
+                <var name="x" type="int">3</var>
+                <var name="y" type="int">10</var>
+                <var name="res" type="int">30</var>
+              </locals>
+            </event>
+            <return_value name="return" type="int">32</return_value>
+          </scope>
+          <event id="23" type="line" timestamp="1775426754.863978">
+            <line>20</line>
+            <source>results.append(val)</source>
+            <delta>
+              <change name="val" action="changed" type="int">
+                <old>22</old>
+                <new>32</new>
+              </change>
+            </delta>
+            <locals>
+              <var name="data" type="list">[1, 2, 3]</var>
+              <var name="results" type="list">[12, 22]</var>
+              <var name="item" type="int">3</var>
+              <var name="val" type="int">32</var>
+            </locals>
+          </event>
+        </iteration>
+        <summary>
+          <variable_changes name="item" initial="1" final="3" change_count="3"/>
+          <variable_changes name="val" initial="12" final="32" change_count="3"/>
+          <variable_changes name="results" initial="[]" final="[12, 22, 32]" change_count="3"/>
+        </summary>
+      </loop>
+      <event id="25" type="line" timestamp="1775426754.863978">
+        <line>21</line>
+        <source>return results</source>
+        <locals>
+          <var name="data" type="list">[1, 2, 3]</var>
+          <var name="results" type="list">[12, 22, 32]</var>
+          <var name="item" type="int">3</var>
+          <var name="val" type="int">32</var>
+        </locals>
+      </event>
+      <return_value name="return" type="list">[12, 22, 32]</return_value>
+    </scope>
+  </events>
+</trace>
