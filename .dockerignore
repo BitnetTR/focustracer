@@ -1,0 +1,23 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Environments
+myenv/
+venv/
+env/
+.venv/
+
+# IDEs
+.idea/
+.vscode/
+
+# Git
+.git/
+.gitignore
+
+# Traces and outputs (so it doesn't copy huge local traces to the image)
+src/output/
+*.xml
+*.targets.json

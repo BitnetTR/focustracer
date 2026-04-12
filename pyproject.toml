@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "focustracer"
+version = "1.0.0"
+description = "FocusTracer - LLM-guided dynamic trace log capture and debugging tool"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Yasin", email = "yasin0.unal@gmail.com"}
+]
+keywords = ["debugging", "trace", "llm", "ai", "fastapi"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
+    "python-multipart>=0.0.9",
+    "sse-starlette>=1.6.1",
+    "pymongo>=4.6.0",
+    "python-dotenv>=1.0.0",
+    "lxml>=5.0.0",
+    "jinja2>=3.1.0",
+    "deepdiff>=6.7.0",
+    "rich>=13.7.0",
+    # Optional hardware monitoring libraries could be moved to optional-dependencies
+    "psutil>=5.0.0",
+    "GPUtil>=1.4.0",
+    "requests"
+]
+
+[project.scripts]
+focustracer = "focustracer.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["focustracer*"]
+
+[tool.setuptools.package-data]
+"focustracer.gui.frontend" = ["dist/**/*"]

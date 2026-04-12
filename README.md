@@ -1,31 +1,3 @@
-Metadata-Version: 2.4
-Name: focustracer
-Version: 1.0.0
-Summary: FocusTracer - LLM-guided dynamic trace log capture and debugging tool
-Author-email: Yasin <yasin0.unal@gmail.com>
-License: MIT
-Keywords: debugging,trace,llm,ai,fastapi
-Classifier: Programming Language :: Python :: 3
-Classifier: License :: OSI Approved :: MIT License
-Classifier: Operating System :: OS Independent
-Requires-Python: >=3.10
-Description-Content-Type: text/markdown
-License-File: LICENSE
-Requires-Dist: fastapi>=0.110.0
-Requires-Dist: uvicorn[standard]>=0.29.0
-Requires-Dist: python-multipart>=0.0.9
-Requires-Dist: sse-starlette>=1.6.1
-Requires-Dist: pymongo>=4.6.0
-Requires-Dist: python-dotenv>=1.0.0
-Requires-Dist: lxml>=5.0.0
-Requires-Dist: jinja2>=3.1.0
-Requires-Dist: deepdiff>=6.7.0
-Requires-Dist: rich>=13.7.0
-Requires-Dist: psutil>=5.0.0
-Requires-Dist: GPUtil>=1.4.0
-Requires-Dist: requests
-Dynamic: license-file
-
 # FocusTracer
 
 FocusTracer is a zero-touch dynamic slicing and XML trace pipeline for AI-assisted Python debugging.
