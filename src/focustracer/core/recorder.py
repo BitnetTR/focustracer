@@ -8,6 +8,7 @@ import re
 import sys
 import threading
 import time
+import traceback as _traceback_module
 import xml.etree.ElementTree as ET
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -56,7 +57,7 @@ class TraceRecorder:
         detail_level: str = "normal",
         output_format: str = "xml",
         enable_threading: bool = False,
-        schema_version: str = "2.1",
+        schema_version: str = "2.2",
         max_iterations: Optional[int] = None,
         target_functions: Optional[list[str]] = None,
         target_files: Optional[list[str]] = None,
@@ -420,8 +421,9 @@ class TraceRecorder:
                     state.stack.pop()
                 state.active_frames = max(state.active_frames - 1, 0)
             elif event == "exception":
-                exc_type, exc_value, _ = arg
+                exc_type, exc_value, exc_tb = arg
                 if event_matches:
+                    tb_lines = _traceback_module.format_tb(exc_tb) if exc_tb else []
                     event_data = {
                         "id": self._next_event_id(),
                         "type": "exception",
@@ -436,6 +438,7 @@ class TraceRecorder:
                         "exception": {
                             "type": getattr(exc_type, "__name__", str(exc_type)),
                             "value": str(exc_value),
+                            "traceback": "".join(tb_lines),
                         },
                     }
                     if caller:
@@ -522,6 +525,20 @@ class TraceRecorder:
             if event_name in counts:
                 ET.SubElement(stats_elem, f"{event_name}_count").text = str(counts[event_name])
 
+        # v2.2: Write instrumented targets to metadata
+        if self.schema_version >= "2.2" and (
+            self.manifest.functions or self.manifest.files
+        ):
+            targets_elem = ET.SubElement(metadata_elem, "targets")
+            for fn in sorted(self.manifest.functions):
+                t = ET.SubElement(targets_elem, "target")
+                t.set("type", "function")
+                t.set("name", fn)
+            for f in sorted(self.manifest.files):
+                t = ET.SubElement(targets_elem, "target")
+                t.set("type", "file")
+                t.set("name", f)
+
         events_elem = ET.SubElement(root, "events")
         if self.schema_version.startswith("2."):
             self._append_structured_to_xml(events_elem, self._build_structured_events())
@@ -561,6 +578,8 @@ class TraceRecorder:
             if event["type"] == "call":
                 scope_events, end_idx = self._collect_scope_events(events, index)
                 closing_event = events[end_idx] if end_idx < len(events) else None
+                start_ts: Optional[float] = event.get("timestamp")
+                end_ts: Optional[float] = None
                 scope_node = {
                     "type": "scope",
                     "function": event["function"],
@@ -571,12 +590,20 @@ class TraceRecorder:
                     "children": self._build_scope_tree(scope_events),
                     "return_value": None,
                     "exception": None,
+                    # v2.2: function-level timing
+                    "start_time": start_ts,
+                    "end_time": None,
+                    "duration": None,
                 }
                 if closing_event is not None:
+                    end_ts = closing_event.get("timestamp")
                     if closing_event["type"] == "return":
                         scope_node["return_value"] = closing_event.get("return_value")
                     elif closing_event["type"] == "exception":
                         scope_node["exception"] = closing_event.get("exception")
+                if start_ts is not None and end_ts is not None:
+                    scope_node["end_time"] = end_ts
+                    scope_node["duration"] = end_ts - start_ts
                 nodes.append(scope_node)
                 index = end_idx + 1
             else:
@@ -785,6 +812,10 @@ class TraceRecorder:
             exc_elem = ET.SubElement(element, "exception")
             ET.SubElement(exc_elem, "type").text = event["exception"]["type"]
             ET.SubElement(exc_elem, "value").text = event["exception"]["value"]
+            # v2.2: traceback
+            tb = event["exception"].get("traceback", "")
+            if tb and self.schema_version >= "2.2":
+                ET.SubElement(exc_elem, "traceback").text = tb
 
         return element
 
@@ -794,6 +825,14 @@ class TraceRecorder:
         element.set("file", node["file"])
         element.set("call_line", str(node["call_line"]))
         element.set("depth", str(node["depth"]))
+        # v2.2: function-level timing
+        if self.schema_version >= "2.2":
+            if node.get("start_time") is not None:
+                element.set("start_time", f"{node['start_time']:.6f}")
+            if node.get("end_time") is not None:
+                element.set("end_time", f"{node['end_time']:.6f}")
+            if node.get("duration") is not None:
+                element.set("duration", f"{node['duration']:.6f}")
 
         if node.get("arguments"):
             args_elem = ET.SubElement(element, "arguments")
@@ -816,6 +855,10 @@ class TraceRecorder:
             exc_elem = ET.SubElement(element, "exception")
             ET.SubElement(exc_elem, "type").text = node["exception"]["type"]
             ET.SubElement(exc_elem, "value").text = node["exception"]["value"]
+            # v2.2: traceback
+            tb = node["exception"].get("traceback", "")
+            if tb and self.schema_version >= "2.2":
+                ET.SubElement(exc_elem, "traceback").text = tb
 
         return element
 

@@ -2,7 +2,7 @@
 Trace Validator
 ===============
 XML trace dosyalarını XSD şemalarıyla doğrular.
-schema_version attribute'una göre v1/v2 XSD otomatik seçilir.
+schema_version attribute'una göre v1/v2/v2.1/v2.2 XSD otomatik seçilir.
 """
 
 import os

@@ -15,6 +15,8 @@ src/focustracer/agent/base.py
 src/focustracer/agent/ollama_client.py
 src/focustracer/agent/opencode_client.py
 src/focustracer/core/__init__.py
+src/focustracer/core/display.py
+src/focustracer/core/loader.py
 src/focustracer/core/patcher.py
 src/focustracer/core/recorder.py
 src/focustracer/core/schema.py
@@ -22,8 +24,11 @@ src/focustracer/core/targeting.py
 src/focustracer/gui/__init__.py
 src/focustracer/gui/server.py
 src/focustracer/gui/settings.py
-src/focustracer/gui/frontend/dist/favicon.svg
-src/focustracer/gui/frontend/dist/icons.svg
-src/focustracer/gui/frontend/dist/index.html
-src/focustracer/gui/frontend/dist/assets/index-BdYYZ8Xt.css
-src/focustracer/gui/frontend/dist/assets/index-Bzp1AYq6.js
+src/focustracer/validate/validator.py
+tests/test_hook_exceptions.py
+tests/test_hook_functions.py
+tests/test_hook_loops.py
+tests/test_hook_threading.py
+tests/test_loader.py
+tests/test_loop_compaction.py
+tests/test_xsd_validation.py

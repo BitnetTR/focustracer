@@ -166,7 +166,7 @@ def create_parser() -> argparse.ArgumentParser:
         default="output",
         help="Trace output directory when --execute is used and --trace-output is not provided",
     )
-    suggest_parser.add_argument("--schema-version", default="2.1")
+    suggest_parser.add_argument("--schema-version", default="2.2")
     suggest_parser.add_argument(
         "--detail", choices=["minimal", "normal", "detailed"], default="detailed"
     )
@@ -198,7 +198,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     run_parser.add_argument("--output", help="Trace XML output path")
     run_parser.add_argument("--output-dir", default="output")
-    run_parser.add_argument("--schema-version", default="2.1")
+    run_parser.add_argument("--schema-version", default="2.2")
     run_parser.add_argument(
         "--detail", choices=["minimal", "normal", "detailed"], default="detailed"
     )
@@ -212,6 +212,37 @@ def create_parser() -> argparse.ArgumentParser:
         help="Skip post-run XML structural validation",
     )
     _add_target_arguments(run_parser)
+
+    load_parser = subparsers.add_parser(
+        "load",
+        help="Load and display a saved trace XML (post-mortem debugging)",
+    )
+    load_parser.add_argument(
+        "trace_file",
+        help="Path to the trace XML file to load",
+    )
+    load_parser.add_argument(
+        "--summary",
+        action="store_true",
+        help="Show only statistics table, skip the execution tree",
+    )
+    load_parser.add_argument(
+        "--filter-function",
+        default=None,
+        metavar="NAME",
+        help="Only show scopes matching this function name",
+    )
+    load_parser.add_argument(
+        "--filter-thread",
+        default=None,
+        metavar="ID_OR_NAME",
+        help="Only show events from this thread ID or name",
+    )
+    load_parser.add_argument(
+        "--no-validate",
+        action="store_true",
+        help="Skip XSD validation before displaying",
+    )
 
     return parser
 
@@ -951,6 +982,43 @@ def run_trace(args: argparse.Namespace) -> int:
     return _execute_trace_with_manifest(args, merged_manifest)
 
 
+def load_trace(args: argparse.Namespace) -> int:
+    """Load a saved XML trace and display it in the terminal."""
+    from focustracer.core.loader import TraceLoader
+    from focustracer.core.display import TraceDisplayer
+
+    trace_file = args.trace_file
+
+    # Optional XSD validation before display
+    if not args.no_validate:
+        from focustracer.validate.validator import validate_xml_against_xsd
+        is_valid, errors = validate_xml_against_xsd(trace_file)
+        if not is_valid:
+            print(f"[!] XSD validation failed for: {trace_file}", file=sys.stderr)
+            for err in errors:
+                print(f"  - {err}", file=sys.stderr)
+            print("[!] Use --no-validate to skip validation and display anyway.", file=sys.stderr)
+            return 1
+
+    try:
+        doc = TraceLoader().load(trace_file)
+    except FileNotFoundError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"[!] Failed to parse trace: {exc}", file=sys.stderr)
+        return 1
+
+    displayer = TraceDisplayer()
+    displayer.display(
+        doc,
+        summary_only=args.summary,
+        filter_function=args.filter_function,
+        filter_thread=args.filter_thread,
+    )
+    return 0
+
+
 def launch_gui(args: argparse.Namespace) -> int:
     """Start the FocusTracer web UI (FastAPI + Uvicorn)."""
     import webbrowser
@@ -997,6 +1065,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         return suggest_targets(args)
     if args.command == "run":
         return run_trace(args)
+    if args.command == "load":
+        return load_trace(args)
     parser.print_help()
     return 1
 
