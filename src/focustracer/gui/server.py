@@ -675,16 +675,33 @@ def get_job(job_id: str) -> dict[str, Any]:
 _FRONTEND_BUILD = Path(__file__).parent / "frontend" / "dist"
 
 
+_BUILD_MISSING_HTML = """<!DOCTYPE html><html><head><meta charset="utf-8"><title>FocusTracer</title>
+<style>body{font-family:monospace;padding:2rem;background:#1a1a2e;color:#eee}
+code{background:#2a2a3e;padding:.2rem .4rem;border-radius:4px}
+pre{background:#2a2a3e;padding:1rem;border-radius:6px;overflow:auto}</style></head>
+<body><h2>FocusTracer GUI</h2><p>Frontend henüz build edilmedi. Aşağıdaki komutu çalıştırın:</p>
+<pre><code>cd src/focustracer/gui/frontend
+npm install
+npm run build</code></pre>
+<p>Sonra <code>focustracer gui</code> komutunu yeniden başlatın.</p></body></html>"""
+
+
 def _mount_static() -> None:
     if _FRONTEND_BUILD.is_dir():
-        app.mount("/assets", StaticFiles(directory=str(_FRONTEND_BUILD / "assets")), name="assets")
+        assets_dir = _FRONTEND_BUILD / "assets"
+        if assets_dir.is_dir():
+            app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
 
         @app.get("/{full_path:path}", include_in_schema=False)
         async def serve_spa(full_path: str):
             index = _FRONTEND_BUILD / "index.html"
             if index.exists():
                 return HTMLResponse(index.read_text(encoding="utf-8"))
-            return HTMLResponse("<h1>Frontend not built yet. Run: npm run build inside gui/frontend.</h1>")
+            return HTMLResponse(_BUILD_MISSING_HTML, status_code=503)
+    else:
+        @app.get("/{full_path:path}", include_in_schema=False)
+        async def serve_build_missing(full_path: str):
+            return HTMLResponse(_BUILD_MISSING_HTML, status_code=503)
 
 
 _mount_static()
