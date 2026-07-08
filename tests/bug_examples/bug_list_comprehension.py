@@ -8,3 +8,4 @@ def bug_list_comprehension():
     print(f"Index 2 sonucu: {multipliers[2](10)}") 
     print(f"Index 4 sonucu: {multipliers[4](10)}")
     
+bug_list_comprehension()

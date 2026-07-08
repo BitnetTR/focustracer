@@ -24,6 +24,16 @@ src/focustracer/core/targeting.py
 src/focustracer/gui/__init__.py
 src/focustracer/gui/server.py
 src/focustracer/gui/settings.py
+src/focustracer/gui/frontend/dist/favicon.svg
+src/focustracer/gui/frontend/dist/icons.svg
+src/focustracer/gui/frontend/dist/index.html
+src/focustracer/gui/frontend/dist/assets/index-BdYYZ8Xt.css
+src/focustracer/gui/frontend/dist/assets/index-CLnJtgrZ.js
+src/focustracer/schema/trace_schema.json
+src/focustracer/schema/trace_schema_v1.xsd
+src/focustracer/schema/trace_schema_v2.1.xsd
+src/focustracer/schema/trace_schema_v2.2.xsd
+src/focustracer/schema/trace_schema_v2.xsd
 src/focustracer/validate/validator.py
 tests/test_hook_exceptions.py
 tests/test_hook_functions.py

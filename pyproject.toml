@@ -44,3 +44,4 @@ include = ["focustracer*"]
 
 [tool.setuptools.package-data]
 "focustracer.gui.frontend" = ["dist/**/*"]
+"focustracer" = ["schema/*.xsd", "schema/*.json"]

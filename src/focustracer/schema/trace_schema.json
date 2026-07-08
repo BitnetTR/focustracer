@@ -1,0 +1,190 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://example.com/trace-schema-v2.json",
+  "title": "Python Trace Schema v2",
+  "description": "JSON Schema for Python execution trace data. Includes source lines, variable deltas, call depth, and stdlib filtering.",
+  "type": "object",
+  "required": ["metadata", "events"],
+  "properties": {
+    "metadata": {
+      "description": "Metadata about the trace execution",
+      "type": "object",
+      "required": ["python_version", "platform", "start_time", "end_time", "detail_level", "statistics"],
+      "properties": {
+        "python_version": {
+          "type": "string",
+          "description": "Python version used for execution"
+        },
+        "platform": {
+          "type": "string",
+          "description": "Operating system platform",
+          "examples": ["win32", "linux", "darwin"]
+        },
+        "start_time": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when trace started"
+        },
+        "end_time": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when trace ended"
+        },
+        "detail_level": {
+          "type": "string",
+          "enum": ["minimal", "normal", "detailed"],
+          "description": "Level of detail in trace output"
+        },
+        "statistics": {
+          "type": "object",
+          "required": ["total_events", "total_duration"],
+          "properties": {
+            "total_events": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total_duration": {
+              "type": "number",
+              "minimum": 0,
+              "description": "Total execution duration in seconds"
+            }
+          }
+        }
+      }
+    },
+    "events": {
+      "description": "Array of trace events (stdlib events are filtered out, only user code)",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/event"
+      }
+    }
+  },
+  "definitions": {
+    "event": {
+      "description": "A single trace event representing one step in program execution",
+      "type": "object",
+      "required": ["seq", "etype", "frame"],
+      "properties": {
+        "seq": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Sequential event number"
+        },
+        "etype": {
+          "type": "string",
+          "enum": ["call", "line", "return", "exception"],
+          "description": "Event type"
+        },
+        "timestamp": {
+          "type": "number",
+          "description": "UNIX timestamp. Present in normal and detailed modes."
+        },
+        "depth": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Call stack depth. 0 = top-level, 1 = called from top-level, etc."
+        },
+        "caller": {
+          "type": "string",
+          "description": "Name of the function that called this function."
+        },
+        "thread_id": {
+          "type": "integer",
+          "description": "Thread identifier. Present only when threading is enabled."
+        },
+        "frame": {
+          "type": "object",
+          "required": ["func", "line", "file"],
+          "description": "Stack frame information",
+          "properties": {
+            "func": {
+              "type": "string",
+              "description": "Function name"
+            },
+            "line": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Line number in source file"
+            },
+            "file": {
+              "type": "string",
+              "description": "Source file path"
+            }
+          }
+        },
+        "source": {
+          "type": "string",
+          "description": "The actual source code on this line (stripped whitespace). This is the key field that makes the trace human-readable."
+        },
+        "args": {
+          "type": "object",
+          "description": "Function arguments (present for 'call' events)",
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/definitions/typed_value"
+            }
+          }
+        },
+        "delta": {
+          "type": "object",
+          "description": "Variables that CHANGED on this line. Only added/changed/removed — not the full snapshot. Key field for spotting bugs.",
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/definitions/delta_entry"
+            }
+          }
+        },
+        "locals": {
+          "type": "object",
+          "description": "Full snapshot of all local variables (detailed mode only)",
+          "patternProperties": {
+            ".*": {
+              "$ref": "#/definitions/typed_value"
+            }
+          }
+        },
+        "retval": {
+          "description": "Return value",
+          "oneOf": [
+            { "type": "string" },
+            { "$ref": "#/definitions/typed_value" },
+            { "type": "null" }
+          ]
+        },
+        "exception": {
+          "type": "object",
+          "description": "Exception information",
+          "required": ["type", "value"],
+          "properties": {
+            "type": { "type": "string", "description": "Exception class name" },
+            "value": { "type": "string", "description": "Exception message" }
+          }
+        }
+      }
+    },
+    "typed_value": {
+      "type": "object",
+      "required": ["value", "type"],
+      "properties": {
+        "value": { "type": "string" },
+        "type": { "type": "string" }
+      }
+    },
+    "delta_entry": {
+      "description": "How a variable changed between two consecutive events",
+      "type": "object",
+      "required": ["action", "type"],
+      "properties": {
+        "action": {
+          "type": "string",
+          "enum": ["added", "changed", "removed"],
+          "description": "added = first assignment, changed = value updated, removed = out of scope"
+        },
+        "old": { "type": "string", "description": "Previous value (for changed/removed)" },
+        "new": { "type": "string", "description": "New value (for added/changed)" },
+        "type": { "type": "string", "description": "Python type name" }
+      }
+    }
+  }
+}
