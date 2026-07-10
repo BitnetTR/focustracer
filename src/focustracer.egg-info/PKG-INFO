@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: focustracer
-Version: 1.0.0
+Version: 1.0.71
 Summary: FocusTracer - LLM-guided dynamic trace log capture and debugging tool
 Author-email: Yasin <yasin0.unal@gmail.com>
 License: MIT

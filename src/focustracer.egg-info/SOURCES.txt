@@ -27,6 +27,7 @@ src/focustracer/gui/settings.py
 src/focustracer/gui/frontend/dist/favicon.svg
 src/focustracer/gui/frontend/dist/icons.svg
 src/focustracer/gui/frontend/dist/index.html
+src/focustracer/gui/frontend/dist/testwrite
 src/focustracer/gui/frontend/dist/assets/index-BdYYZ8Xt.css
 src/focustracer/gui/frontend/dist/assets/index-CLnJtgrZ.js
 src/focustracer/schema/trace_schema.json

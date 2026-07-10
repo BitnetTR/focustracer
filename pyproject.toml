@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "focustracer"
-version = "1.0.0"
+version = "1.0.8"
 description = "FocusTracer - LLM-guided dynamic trace log capture and debugging tool"
 readme = "README.md"
 requires-python = ">=3.10"

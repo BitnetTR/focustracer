@@ -8,9 +8,14 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-dist
 dist-ssr
 *.local
+
+# NOTE: dist/ is intentionally NOT ignored here.
+# The built SPA in dist/ is shipped as package-data so that
+# `pip install .` / `pip install git+https://...` gives users a working
+# `focustracer gui` without needing Node/npm installed. Rebuild with
+# `npm run build` and commit the result before tagging a release.
 
 # Editor directories and files
 .vscode/*
