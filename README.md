@@ -4,6 +4,12 @@ FocusTracer is a zero-touch dynamic slicing and XML trace pipeline for AI-assist
 
 Turkish usage guide: [README.tr.md](./README.tr.md)
 
+Aşağıdaki videolardan FocusTracer'ın yeniliklerini ve kullanım detaylarını inceleyebilirsiniz:
+
+| 🎥 AI4Sweng - FocusTracer (Bölüm 1) | 🚀 AI4Sweng - FocusTracer (Bölüm 2) |
+| :---: | :---: |
+| [![Bölüm 1](https://img.youtube.com/vi/XoAJj4MXodw/hqdefault.jpg)](https://www.youtube.com/watch?v=XoAJj4MXodw) | [![Bölüm 2](https://img.youtube.com/vi/P0XSIVUeN_Y/hqdefault.jpg)](https://www.youtube.com/watch?v=P0XSIVUeN_Y) |
+
 ## Quick Start
 
 ```bash
