@@ -5,3 +5,5 @@ output/
 tests
 .understand-anything/
 build/
+# Added by code-review-graph
+.code-review-graph/
