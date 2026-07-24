@@ -175,6 +175,29 @@ python -m focustracer explain output/sample_trace.xml --at app.py:42:total --out
 The model answers with: (1) root cause, (2) the causal chain in plain language,
 (3) a concrete fix. `--show-context` prints the slice context and needs no agent.
 
+### `reverse`
+
+**Reverse execution / state rewind.** Reconstructs the observable program state
+at a point (the crash by default) and steps *backward* through the execution,
+watching values un-wind — all from the saved trace, no re-run. Read-only: it
+does not modify the trace.
+
+```bash
+# State at the crash, plus the reverse timeline:
+python -m focustracer reverse output/sample_trace.xml --at-exception --step-back 6
+
+# State at a specific event or line:
+python -m focustracer reverse output/sample_trace.xml --at-event 18
+python -m focustracer reverse output/sample_trace.xml --at-line 42 --function compute
+
+# Dump the reconstructed state(s) to JSON:
+python -m focustracer reverse output/sample_trace.xml --at-exception --json rewind.json
+```
+
+Example: at each backward step it shows what a variable *un-does*
+(`undo total: 12 → 6`), crossing call boundaries as it rewinds. Values are the
+observable (string) state each variable showed, not live objects.
+
 ## Using Local Ollama Reliably
 
 Recommended bridge flow for CLI-only environments:
@@ -240,7 +263,8 @@ with TraceContext(
 - `agent/opencode_client.py`: OpenCode CLI health and target suggestion
 - `core/slicer.py`: backward dynamic slicing (data + control dependency) over a trace
 - `core/explain.py`: builds the value-annotated slice context and drives LLM root-cause explanation
-- `cli.py`: `check-agent`, `suggest-targets`, `run`, `load`, `slice`, `explain`
+- `core/reverse.py`: reverse execution — reconstructs observable state and rewinds through a trace
+- `cli.py`: `check-agent`, `suggest-targets`, `run`, `load`, `slice`, `explain`, `reverse`
 
 ## CLI Reference (Detaylı)
 

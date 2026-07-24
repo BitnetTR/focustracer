@@ -316,6 +316,36 @@ def create_parser() -> argparse.ArgumentParser:
         "--output", default=None, help="Write the explanation to this file",
     )
 
+    # ---------------------------------------------------------------- reverse
+    reverse_parser = subparsers.add_parser(
+        "reverse",
+        help="Reverse execution: reconstruct state and step backward through a trace",
+    )
+    reverse_parser.add_argument("trace_file", help="Path to the trace XML file")
+    reverse_parser.add_argument(
+        "--at-exception", action="store_true",
+        help="Reconstruct state at the crash (default if no --at-event/--at-line)",
+    )
+    reverse_parser.add_argument(
+        "--at-event", type=int, default=None, metavar="ID",
+        help="Reconstruct state at line event ID",
+    )
+    reverse_parser.add_argument(
+        "--at-line", type=int, default=None, metavar="LINE",
+        help="Reconstruct state at a source line",
+    )
+    reverse_parser.add_argument(
+        "--function", default=None, help="Disambiguate --at-line by function",
+    )
+    reverse_parser.add_argument(
+        "--step-back", type=int, default=5, metavar="K",
+        help="How many line-events to rewind from the target (default 5)",
+    )
+    reverse_parser.add_argument(
+        "--json", default=None, metavar="PATH",
+        help="Write the reconstructed state(s) to a JSON sidecar",
+    )
+
     return parser
 
 
@@ -1226,6 +1256,67 @@ def explain_cmd(args: argparse.Namespace) -> int:
     return 0
 
 
+def _fmt_state(state: dict, limit: int = 12) -> str:
+    items = [f"{n}={v[0]}" for n, v in list(state.items())[:limit]]
+    if len(state) > limit:
+        items.append(f"… (+{len(state) - limit})")
+    return ", ".join(items) if items else "(empty)"
+
+
+def reverse_cmd(args: argparse.Namespace) -> int:
+    """Reconstruct observable state at a point and rewind step-by-step."""
+    from focustracer.core.reverse import reverse_trace, result_to_dict, state_diff
+
+    try:
+        result = reverse_trace(
+            args.trace_file,
+            at_exception=args.at_exception,
+            at_event=args.at_event,
+            at_line=args.at_line,
+            function=args.function,
+            step_back=max(0, args.step_back),
+        )
+    except FileNotFoundError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"[!] Reverse failed: {exc}", file=sys.stderr)
+        return 1
+
+    t = result.target
+    print(f"[*] Reverse state @ {result.label}  —  {t.function} L{t.line}: {t.source}")
+    print("-" * 60)
+    for name, (value, vtype) in t.state.items():
+        print(f"    {name} = {value}    ({vtype})")
+    print("-" * 60)
+
+    if result.timeline:
+        print(f"◀ Reverse timeline — {len(result.timeline)} step(s) back:")
+        ordered = result.timeline + [t]
+        # walk backward from the moment just before the target
+        for i in range(len(ordered) - 2, -1, -1):
+            m = ordered[i]
+            step = i - (len(ordered) - 1)
+            print(f"  {step:>3}  {m.function} L{m.line}: {m.source}")
+            later = ordered[i + 1]
+            if later.frame_id == m.frame_id:
+                diffs = state_diff(m, later)
+                for name, ev, lv in diffs:
+                    print(f"         undo  {name}: {lv} → {ev}")
+            else:
+                print(f"         ↑ returned from {later.function} to {m.function}")
+                print(f"         state: {_fmt_state(m.state)}")
+        print("-" * 60)
+
+    if args.json:
+        Path(args.json).write_text(
+            json.dumps(result_to_dict(result), indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        print(f"[*] Reconstructed state written to {args.json}", file=sys.stderr)
+    return 0
+
+
 def launch_gui(args: argparse.Namespace) -> int:
     """Start the FocusTracer web UI (FastAPI + Uvicorn)."""
     import webbrowser
@@ -1278,6 +1369,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         return slice_trace_cmd(args)
     if args.command == "explain":
         return explain_cmd(args)
+    if args.command == "reverse":
+        return reverse_cmd(args)
     parser.print_help()
     return 1
 
