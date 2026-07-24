@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
-from TraceRecorder import TraceContext
+from focustracer import TraceContext
 
 
 # --- Helpers ----------------------------------------------------------------

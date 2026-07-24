@@ -4,7 +4,7 @@ import sys
 # Proje ana dizinini path'e ekle (TraceRecorder ve auto_debugger'a erişim için)
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from TraceRecorder import TraceContext, trace_function
+from focustracer import TraceContext, trace_function
 from focustracer.debugger_app.config import DebugConfig
 from focustracer.debugger_app.runner import TraceRunner
 

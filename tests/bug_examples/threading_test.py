@@ -6,7 +6,7 @@ Thread-safe trace kaydını test eder.
 
 import threading
 import time
-from TraceRecorder import TraceContext
+from focustracer import TraceContext
 
 
 def worker_task(worker_id, iterations):

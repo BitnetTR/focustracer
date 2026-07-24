@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from TraceRecorder import TraceContext
+from focustracer import TraceContext
 
 def compute_series(limit):
     """

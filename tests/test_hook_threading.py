@@ -4,7 +4,7 @@ import threading
 import time
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-from TraceRecorder import TraceContext
+from focustracer import TraceContext
 
 mutex = threading.Lock()
 shared_resource = 0

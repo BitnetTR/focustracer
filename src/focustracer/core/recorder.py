@@ -507,12 +507,16 @@ class TraceRecorder:
 
     def _build_xml_tree(self) -> ET.Element:
         root = ET.Element("trace")
-        root.set("schema_version", self.schema_version)
+        # schema_version is a v2.x contract field; the v1 XSD forbids it on <trace>.
+        if self.schema_version.startswith("2."):
+            root.set("schema_version", self.schema_version)
 
         metadata_elem = ET.SubElement(root, "metadata")
         for key in ("python_version", "platform", "start_time", "end_time"):
             ET.SubElement(metadata_elem, key).text = str(self.metadata.get(key))
-        ET.SubElement(metadata_elem, "schema_version").text = self.schema_version
+        # v1 metadata has no <schema_version> child (the schema expects <statistics> next).
+        if self.schema_version.startswith("2."):
+            ET.SubElement(metadata_elem, "schema_version").text = self.schema_version
 
         stats_elem = ET.SubElement(metadata_elem, "statistics")
         ET.SubElement(stats_elem, "total_events").text = str(len(self.events))

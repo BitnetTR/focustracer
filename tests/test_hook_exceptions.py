@@ -3,7 +3,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from TraceRecorder import trace_function
+from focustracer import trace_function
 
 # Decorator kullanılarak (manuel) hata fırlatan bir fonksiyonu hook'luyoruz
 # Çıktı yine AI'ın rahat okuyabileceği XML (.xml) formatında.

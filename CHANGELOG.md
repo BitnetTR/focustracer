@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.0.9] — 2026-07-24 — Test paketi ve şema hijyeni
+
+KIO2 (reverse execution & dynamic slicing) geliştirmeleri öncesi temizlik sürümü.
+Yeşil bir test paketi, sonraki fazlar için güvenlik ağı sağlar.
+
+### Fixed
+- **v1 şema regresyonu:** `TraceRecorder`, tüm sürümlerde `<trace>` üzerine
+  `schema_version` attribute'u ve `<schema_version>` metadata child'ı yazıyordu;
+  v1 XSD ikisini de reddediyordu. Artık bu alanlar yalnızca 2.x çıktısında yazılır
+  (v1 loader, attribute yokluğunda zaten `"1.0"` varsayıyor).
+- **Loader call sayımı:** `TraceDocument.event_type_counts()`, v2.x hiyerarşik
+  formatta çağrıları saymıyordu (çağrılar `<event type="call">` değil `<scope>`
+  olarak kodlanıyor). Artık her `<scope>` bir `call` olarak sayılır; v1 flat
+  format ile tutarlı.
+- **Kırık test importları:** 10 test/demo dosyasındaki eski
+  `from TraceRecorder import ...` importları `from focustracer import ...` olarak
+  düzeltildi (paket `src/focustracer` layout'una taşınmıştı).
+
+### Removed
+- Kullanılmayan `pymongo` bağımlılığı `pyproject.toml` ve `requirements.txt`'ten
+  kaldırıldı (kod tabanında hiçbir referansı yoktu).
+
+### Changed
+- `pyproject.toml`'a `[tool.pytest.ini_options]` eklendi: `pythonpath = ["src"]`
+  ve `testpaths = ["tests"]` — editable install olmadan da `pytest` çalışır.
+- `tests/conftest.py` eklendi: `bug_examples/*` ve `test_hook_*` demo/repro
+  script'leri (assert'siz, `__main__` guard'lı) test toplamasından çıkarıldı.
+
 ## [Unreleased] — Schema v2.2 + Post-Mortem Debugging
 
 ### Added

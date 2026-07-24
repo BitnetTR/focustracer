@@ -1,9 +1,6 @@
 # Python Trace Recorder - Requirements
 # =====================================
 
-# MongoDB driver
-pymongo>=4.6.0
-
 # Environment variables
 python-dotenv>=1.0.0
 

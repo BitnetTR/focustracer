@@ -4,7 +4,7 @@ import sys
 # TraceRecorder'ı projeden dahil edebilmek için
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from TraceRecorder import TraceContext
+from focustracer import TraceContext
 
 def inner_math_operation(x, y):
     """Bu fonksiyon hedeflenen `process_data` içerisinden çağrıldığı için 
