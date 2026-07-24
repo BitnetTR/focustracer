@@ -140,6 +140,7 @@ class Step:
     defs: list[str]
     kind: str  # "line" | "return" | "exception" | "loop_header"
     event_id: Optional[int] = None
+    values: dict[str, str] = field(default_factory=dict)  # read name -> runtime value
     data_deps: set[int] = field(default_factory=set)
     control_dep: Optional[int] = None
 
@@ -154,6 +155,7 @@ class Frame:
     params: list[str]
     return_seq: Optional[int] = None
     exception_seq: Optional[int] = None
+    exception_info: Optional[dict[str, str]] = None  # {type, value, traceback}
 
 
 class ExecutionModel:
@@ -208,6 +210,7 @@ class ExecutionModel:
                 frame = self.frames[fid]
                 if node.get("exception") is not None:
                     frame.exception_seq = self._last_seq_in_frame(fid)
+                    frame.exception_info = node.get("exception")
                 if node.get("return_value") is not None:
                     frame.return_seq = self._last_seq_in_frame(fid)
             elif ntype == "loop":
@@ -240,13 +243,14 @@ class ExecutionModel:
         _uses, defs = parse_line_def_use(source)
         reads = data.get("reads") or {}
         uses = list(reads.keys()) if reads else _uses
+        values = {name: val for name, (val, _type) in reads.items()}
         self._emit(
             frame_id=frame_id if frame_id is not None else -1,
             line=data.get("line", 0),
             file=data.get("file") or ctx_file,
             function=data.get("function") or ctx_func,
             source=source, uses=uses, defs=defs, kind=etype,
-            event_id=data.get("id"),
+            event_id=data.get("id"), values=values,
         )
 
     # -- dependency edges --------------------------------------------------

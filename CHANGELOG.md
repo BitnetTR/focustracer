@@ -1,5 +1,34 @@
 # Changelog
 
+## [1.3.0] — 2026-07-24 — `explain` komutu: slice'tan LLM root-cause
+
+KIO2 dynamic slicing fazı 3 (Stage 4 — Explain). LLM'e ham trace yerine
+**slice** verilir: nedensel zincir + her ifadenin okuduğu **çalışma-anı
+değerleri**. Böylece küçük yerel bir model (qwen2.5:3b) bile kök nedeni
+isabetle bulur. Ölü `analyze_trace()` bu amaçla canlandırıldı.
+
+### Added
+- **`focustracer explain <trace.xml>`** CLI komutu:
+  - `--at-exception` / `--at [FILE:]LINE[:VAR]`: slice kriteri (slice komutuyla aynı).
+  - `--agent`/`--model`/`--ollama-url`/`--opencode-cmd`: LLM seçimi.
+  - `--show-context`: modele giden slice context'ini yazdırır (agent gerektirmez, offline).
+  - `--error-context`: modele ek bağlam. `--output`: açıklamayı dosyaya yaz.
+  - Model çıktısı: (1) kök neden, (2) düz dille nedensel zincir, (3) somut fix.
+- **`core/explain.py`**:
+  - `build_slice_context(model, result)` — slice'ı çalışma-anı değerleriyle
+    kompakt prompt metnine dönüştürür (deterministik, LLM'siz test edilir).
+  - `EXPLAIN_SYSTEM_PROMPT`, `explain_slice(agent, model, result, ...)`.
+- `tests/test_explain.py`: context içeriği (exception + `b=0` değeri), context'in
+  ham trace'ten küçük olması, agent'a context'in ulaşması (fake agent), ve
+  `analyze_trace`'in prompt kurulumu (monkeypatch — server gerektirmez).
+
+### Changed
+- **`analyze_trace()` repurpose edildi** (`base` + `ollama` + `opencode`): artık
+  ham trace+kaynak dosyası yerine hazır **slice_context** alıp `EXPLAIN_SYSTEM_PROMPT`
+  ile sarmalıyor. Eski imza (30k karakter XML dump) kaldırıldı — ölü koddu.
+- `slicer.Step` artık okuma değerlerini (`values`), `slicer.Frame` exception
+  bilgisini (`exception_info`) taşıyor — explanation context için.
+
 ## [1.2.0] — 2026-07-24 — `slice` komutu: backward dynamic slicing
 
 KIO2 dynamic slicing fazı 2. Kaydedilmiş bir trace üzerinde, bir *kriterden*

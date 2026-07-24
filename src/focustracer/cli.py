@@ -280,6 +280,42 @@ def create_parser() -> argparse.ArgumentParser:
         help="Skip XSD validation of the sliced output",
     )
 
+    # ---------------------------------------------------------------- explain
+    explain_parser = subparsers.add_parser(
+        "explain",
+        help="LLM root-cause explanation from a backward dynamic slice",
+    )
+    explain_parser.add_argument(
+        "trace_file",
+        help="Path to the trace XML file (detailed, schema >= 2.3)",
+    )
+    explain_parser.add_argument("--agent", choices=["ollama", "opencode"], default="ollama")
+    explain_parser.add_argument("--model", default=DEFAULT_MODEL)
+    explain_parser.add_argument("--ollama-url", default="http://localhost:11434")
+    explain_parser.add_argument("--opencode-cmd", default="opencode")
+    explain_parser.add_argument(
+        "--at-exception",
+        action="store_true",
+        help="Explain the innermost exception (default if no --at)",
+    )
+    explain_parser.add_argument(
+        "--at", default=None, metavar="[FILE:]LINE[:VAR]",
+        help="Slice criterion, e.g. app.py:42:total",
+    )
+    explain_parser.add_argument(
+        "--no-control", action="store_true", help="Data dependencies only",
+    )
+    explain_parser.add_argument(
+        "--error-context", default=None, help="Extra context passed to the model",
+    )
+    explain_parser.add_argument(
+        "--show-context", action="store_true",
+        help="Print the exact slice context sent to the model",
+    )
+    explain_parser.add_argument(
+        "--output", default=None, help="Write the explanation to this file",
+    )
+
     return parser
 
 
@@ -1110,6 +1146,57 @@ def slice_trace_cmd(args: argparse.Namespace) -> int:
     return 0
 
 
+def explain_cmd(args: argparse.Namespace) -> int:
+    """Compute a slice, then ask the LLM for a root-cause explanation."""
+    from focustracer.core.slicer import slice_trace
+    from focustracer.core.explain import build_slice_context, explain_slice
+
+    at_exception = args.at_exception or not args.at
+    try:
+        model, result = slice_trace(
+            args.trace_file, at_exception=at_exception, at=args.at,
+            include_control=not args.no_control,
+        )
+    except FileNotFoundError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"[!] Slice failed: {exc}", file=sys.stderr)
+        return 1
+
+    context = build_slice_context(model, result)
+    if args.show_context:
+        print("=== SLICE CONTEXT (sent to model) ===")
+        print(context)
+        print("=" * 40)
+
+    agent = _build_agent(args.agent, args.model, args.ollama_url, args.opencode_cmd)
+    health = agent.health()
+    if not health.get("ok"):
+        print(json.dumps(health, indent=2))
+        print("[!] AI agent is not reachable — cannot explain. "
+              "The slice above/`focustracer slice` still works offline.", file=sys.stderr)
+        return 1
+
+    try:
+        explanation, _ = explain_slice(
+            agent, model, result, error_context=args.error_context
+        )
+    except Exception as exc:  # noqa: BLE001 — surface any agent error to the user
+        print(f"[!] Explanation failed: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"[*] Criterion: {result.criterion_label}")
+    print("-" * 60)
+    print(explanation.strip())
+    print("-" * 60)
+
+    if args.output:
+        Path(args.output).write_text(explanation.strip() + "\n", encoding="utf-8")
+        print(f"[*] Explanation written to {args.output}", file=sys.stderr)
+    return 0
+
+
 def launch_gui(args: argparse.Namespace) -> int:
     """Start the FocusTracer web UI (FastAPI + Uvicorn)."""
     import webbrowser
@@ -1160,6 +1247,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         return load_trace(args)
     if args.command == "slice":
         return slice_trace_cmd(args)
+    if args.command == "explain":
+        return explain_cmd(args)
     parser.print_help()
     return 1
 

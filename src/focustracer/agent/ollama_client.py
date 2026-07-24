@@ -180,21 +180,15 @@ class OllamaClient(BaseAIAgent):
 
     def analyze_trace(
         self,
-        trace_file: str,
-        source_file: str,
+        slice_context: str,
         *,
         error_context: str | None = None,
     ) -> str:
-        trace_text = Path(trace_file).read_text(encoding="utf-8")
-        source_text = Path(source_file).read_text(encoding="utf-8")
-        prompt = (
-            "Analyze the following Python trace and source file.\n"
-            "Explain the likely root cause and recommend the next tracing focus.\n\n"
-            f"Error context:\n{error_context or ''}\n\n"
-            f"Source:\n{source_text[:20000]}\n\n"
-            f"Trace:\n{trace_text[:30000]}"
-        )
-        return self.generate(prompt, max_tokens=2048)
+        from focustracer.core.explain import EXPLAIN_SYSTEM_PROMPT
+
+        extra = f"Additional user context: {error_context}\n\n" if error_context else ""
+        prompt = f"{EXPLAIN_SYSTEM_PROMPT}\n\n{extra}{slice_context}"
+        return self.generate(prompt, max_tokens=1024)
 
     @staticmethod
     def _extract_manifest(raw_response: str) -> TargetManifest:
