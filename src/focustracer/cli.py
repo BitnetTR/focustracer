@@ -1091,6 +1091,18 @@ def load_trace(args: argparse.Namespace) -> int:
     return 0
 
 
+def _print_slice_failure(exc: Exception, args: argparse.Namespace) -> None:
+    """Print a slice/explain failure with an actionable hint."""
+    msg = str(exc)
+    print(f"[!] Slice failed: {msg}", file=sys.stderr)
+    if "no exception" in msg.lower() and not args.at:
+        print(
+            "    This trace has no exception, and --at-exception is the default.\n"
+            "    Slice a specific value instead:  --at LINE[:VAR]   (e.g. --at 42:total)",
+            file=sys.stderr,
+        )
+
+
 def slice_trace_cmd(args: argparse.Namespace) -> int:
     """Compute a backward dynamic slice and embed it into a copy of the trace."""
     from focustracer.core.slicer import slice_trace, annotate_trace_with_slice, slice_result_to_dicts
@@ -1109,7 +1121,7 @@ def slice_trace_cmd(args: argparse.Namespace) -> int:
         print(f"[!] {exc}", file=sys.stderr)
         return 1
     except ValueError as exc:
-        print(f"[!] Slice failed: {exc}", file=sys.stderr)
+        _print_slice_failure(exc, args)
         return 1
 
     if not any(step.event_id is not None and (step.uses or step.defs) for step in model.steps):
@@ -1161,7 +1173,7 @@ def explain_cmd(args: argparse.Namespace) -> int:
         print(f"[!] {exc}", file=sys.stderr)
         return 1
     except ValueError as exc:
-        print(f"[!] Slice failed: {exc}", file=sys.stderr)
+        _print_slice_failure(exc, args)
         return 1
 
     context = build_slice_context(model, result)

@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: focustracer
-Version: 1.0.71
+Version: 1.3.0
 Summary: FocusTracer - LLM-guided dynamic trace log capture and debugging tool
 Author-email: Yasin <yasin0.unal@gmail.com>
 License: MIT
@@ -15,7 +15,6 @@ Requires-Dist: fastapi>=0.110.0
 Requires-Dist: uvicorn[standard]>=0.29.0
 Requires-Dist: python-multipart>=0.0.9
 Requires-Dist: sse-starlette>=1.6.1
-Requires-Dist: pymongo>=4.6.0
 Requires-Dist: python-dotenv>=1.0.0
 Requires-Dist: lxml>=5.0.0
 Requires-Dist: jinja2>=3.1.0
@@ -31,6 +30,22 @@ Dynamic: license-file
 FocusTracer is a zero-touch dynamic slicing and XML trace pipeline for AI-assisted Python debugging.
 
 Turkish usage guide: [README.tr.md](./README.tr.md)
+
+
+| 🎥 AI4Sweng - FocusTracer (Bölüm 1) | 🚀 AI4Sweng - FocusTracer (Bölüm 2) |
+| :---: | :---: |
+| [![Bölüm 1](https://img.youtube.com/vi/XoAJj4MXodw/hqdefault.jpg)](https://www.youtube.com/watch?v=XoAJj4MXodw) | [![Bölüm 2](https://img.youtube.com/vi/P0XSIVUeN_Y/hqdefault.jpg)](https://www.youtube.com/watch?v=P0XSIVUeN_Y) |
+
+
+## Slide
+
+<div align="center">
+  <a href="./docs/FocusTracer_Sunum.pptx">
+  <img width="500" src="https://github.com/user-attachments/assets/b89d0e92-3f80-48ea-9269-730be880a10e" alt="Watch the Presentation">
+</a>
+
+</div>
+
 
 ## Quick Start
 
@@ -136,6 +151,47 @@ python -m focustracer run \
   --hint "Trace the worker path and multiplication logic"
 ```
 
+### `slice`
+
+Computes a **backward dynamic slice** over a saved trace: the statements that
+actually influenced a value on this run (data + control dependencies). Needs a
+`detailed`, schema ≥ 2.3 trace (the default for `run`). Writes the slice into a
+`<slice>` element in `<trace>.sliced.xml` and re-validates against the v2.3 XSD.
+
+```bash
+# Slice from the innermost exception's failing line (root-cause):
+python -m focustracer slice output/sample_trace.xml --at-exception
+
+# Slice a specific value: which statements produced `total` at line 42?
+python -m focustracer slice output/sample_trace.xml --at app.py:42:total
+
+# Data dependencies only (skip control):
+python -m focustracer slice output/sample_trace.xml --at-exception --no-control
+```
+
+Output markers: `◆` criterion, `▸` control dependency, `·` data dependency.
+
+### `explain`
+
+Computes a slice and asks an LLM for a **root-cause explanation**. The model is
+given the *slice* — the causal chain annotated with runtime values — not the raw
+trace, so even a small local model (e.g. `qwen2.5:3b`) can pinpoint the cause.
+
+```bash
+# Explain the root cause of an exception:
+python -m focustracer explain output/sample_trace.xml \
+  --at-exception --model qwen2.5:3b --ollama-url http://localhost:11434
+
+# See exactly what the model receives (works offline):
+python -m focustracer explain output/sample_trace.xml --at-exception --show-context
+
+# Explain a specific value, and save the explanation:
+python -m focustracer explain output/sample_trace.xml --at app.py:42:total --output rootcause.md
+```
+
+The model answers with: (1) root cause, (2) the causal chain in plain language,
+(3) a concrete fix. `--show-context` prints the slice context and needs no agent.
+
 ## Using Local Ollama Reliably
 
 Recommended bridge flow for CLI-only environments:
@@ -199,7 +255,9 @@ with TraceContext(
 - `core/targeting.py`: target manifest and code inventory helpers
 - `agent/ollama_client.py`: Ollama health, model listing, target suggestion
 - `agent/opencode_client.py`: OpenCode CLI health and target suggestion
-- `cli.py`: `check-agent`, `suggest-targets`, `run`
+- `core/slicer.py`: backward dynamic slicing (data + control dependency) over a trace
+- `core/explain.py`: builds the value-annotated slice context and drives LLM root-cause explanation
+- `cli.py`: `check-agent`, `suggest-targets`, `run`, `load`, `slice`, `explain`
 
 ## CLI Reference (Detaylı)
 

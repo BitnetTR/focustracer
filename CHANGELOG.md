@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.3.1] — 2026-07-24 — GUI çıktı düzeltmeleri + slice UX
+
+Kullanıcı geri bildirimi üzerine düzeltmeler.
+
+### Fixed
+- **GUI schema 2.1 → 2.3:** `RunTraceRequest`/`SuggestRequest` varsayılan
+  `schema_version` "2.1"'di; GUI ile alınan trace'lerde `<reads>` yoktu ve
+  slicing bozuk çalışıyordu. Artık 2.3 (detail zaten "detailed"'dı).
+- **GUI çıktı yolu:** trace/manifest dosyaları her zaman kurulum içindeki
+  `focustracer/src/output`'a yazılıyordu; kullanıcının GUI'de açtığı proje
+  yolu yok sayılıyordu. Artık `<project_root>/output/` (yoksa `<cwd>/output/`)
+  altına yazılır; `/api/outputs` listesi de oradan okur. Yeni `_output_base`
+  yardımcısı bu yolu tek yerden belirler.
+
+### Changed
+- **`slice`/`explain` UX:** `--at-exception` sessizce varsayılan olduğundan,
+  exception içermeyen bir trace'te "no exception found" mesajı kafa karıştırıcıydı.
+  Artık net bir yönlendirme yazılır: `--at LINE[:VAR]` ile belirli bir değeri
+  dilimle (örn. `--at 42:total`).
+
 ## [1.3.0] — 2026-07-24 — `explain` komutu: slice'tan LLM root-cause
 
 KIO2 dynamic slicing fazı 3 (Stage 4 — Explain). LLM'e ham trace yerine
