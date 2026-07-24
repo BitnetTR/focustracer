@@ -314,6 +314,7 @@ class TraceLoader:
             "file": "",
             "thread_id": "",
             "delta": [],
+            "reads": {},
             "arguments": {},
             "locals": {},
             "return_value": None,
@@ -334,6 +335,12 @@ class TraceLoader:
                 data["thread_id"] = text
             elif tag == "delta":
                 data["delta"] = self._parse_delta(child)
+            elif tag == "reads":
+                data["reads"] = {
+                    r.get("name", ""): ((r.text or "").strip(), r.get("type", ""))
+                    for r in child
+                    if r.tag == "read"
+                }
             elif tag == "arguments":
                 data["arguments"] = self._parse_arguments(child)
             elif tag == "locals":

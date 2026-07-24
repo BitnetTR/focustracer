@@ -166,7 +166,7 @@ def create_parser() -> argparse.ArgumentParser:
         default="output",
         help="Trace output directory when --execute is used and --trace-output is not provided",
     )
-    suggest_parser.add_argument("--schema-version", default="2.2")
+    suggest_parser.add_argument("--schema-version", default="2.3")
     suggest_parser.add_argument(
         "--detail", choices=["minimal", "normal", "detailed"], default="detailed"
     )
@@ -198,7 +198,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     run_parser.add_argument("--output", help="Trace XML output path")
     run_parser.add_argument("--output-dir", default="output")
-    run_parser.add_argument("--schema-version", default="2.2")
+    run_parser.add_argument("--schema-version", default="2.3")
     run_parser.add_argument(
         "--detail", choices=["minimal", "normal", "detailed"], default="detailed"
     )

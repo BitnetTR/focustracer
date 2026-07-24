@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.1.0] — 2026-07-24 — XSD v2.3 + reads (use-set) yakalama
+
+KIO2 dynamic slicing için ilk faz. Backward slicing, çalışan her satırın
+*okuduğu* (use) değişkenleri gerektirir; bu sürüm onları trace'e ekler.
+Slice hesaplaması (`focustracer slice`) bir sonraki sürümde (v1.2.0) gelecek.
+
+### Added
+- **XSD v2.3** (`schema/trace_schema_v2.3.xsd`, `src/focustracer/schema/` kopyası):
+  - `<reads>` elementi (satır event'lerinde, opsiyonel): satırın okuduğu
+    değişkenler `<read name type>değer</read>` biçiminde. `<delta>` (yazılanlar)
+    ile simetrik; XSD sırası `delta → reads → arguments`.
+  - `<slice>` elementi (kök `<trace>` altında, opsiyonel) + `SliceType`,
+    `SliceNodeType`, `SliceDependencyEnum` (data/control/criterion). Şema
+    kelime dağarcığı şimdi tanımlandı; v1.2.0 dolduracak.
+  - Tüm yeni alanlar opsiyonel — v2.2 dosyaları v2.2 XSD ile geçerli kalır.
+- **Reads yakalama** (`TraceRecorder`): `detailed` mod + schema ≥ 2.3'te her
+  satır için okunan değişkenler kaydedilir. İsimler `ast` ile satır kaynağından
+  çıkarılır (Name/Load + AugAssign target = read); değerler satır *çalışmadan
+  önceki* locals'tan alınır — yani satırın gerçekten okuduğu değerler. Yerel
+  scope'ta olmayan isimler (global, builtin, çağrılan fonksiyon adı) atlanır.
+- `tests/test_reads_capture.py`: reads içeriği, v2.3 XSD doğrulaması, loader
+  round-trip, ve gating (normal mod / schema < 2.3'te reads yok) testleri.
+
+### Changed
+- Varsayılan `schema_version`: `2.2` → `2.3` (`TraceRecorder` + `run`/`suggest`
+  CLI). `run` zaten varsayılan `--detail detailed` olduğu için trace'ler artık
+  kutudan çıktığı gibi slice'a hazır (reads içerir).
+- `TraceLoader` artık `<reads>` elementini parse edip event data'ya taşır
+  (v1.2.0 slice komutunun XML'i okuması için).
+
 ## [1.0.9] — 2026-07-24 — Test paketi ve şema hijyeni
 
 KIO2 (reverse execution & dynamic slicing) geliştirmeleri öncesi temizlik sürümü.
