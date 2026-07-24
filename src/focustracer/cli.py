@@ -244,6 +244,42 @@ def create_parser() -> argparse.ArgumentParser:
         help="Skip XSD validation before displaying",
     )
 
+    # ------------------------------------------------------------------ slice
+    slice_parser = subparsers.add_parser(
+        "slice",
+        help="Compute a backward dynamic slice over a saved trace (v2.3)",
+    )
+    slice_parser.add_argument(
+        "trace_file",
+        help="Path to the trace XML file (must be detailed, schema >= 2.3)",
+    )
+    slice_parser.add_argument(
+        "--at-exception",
+        action="store_true",
+        help="Slice from the innermost exception's failing line (default if no --at)",
+    )
+    slice_parser.add_argument(
+        "--at",
+        default=None,
+        metavar="[FILE:]LINE[:VAR]",
+        help="Slice criterion, e.g. app.py:42:total or 42:total",
+    )
+    slice_parser.add_argument(
+        "--no-control",
+        action="store_true",
+        help="Data dependencies only (skip control dependencies)",
+    )
+    slice_parser.add_argument(
+        "--output",
+        default=None,
+        help="Sliced XML output path (default: <trace>.sliced.xml next to input)",
+    )
+    slice_parser.add_argument(
+        "--no-validate",
+        action="store_true",
+        help="Skip XSD validation of the sliced output",
+    )
+
     return parser
 
 
@@ -1019,6 +1055,61 @@ def load_trace(args: argparse.Namespace) -> int:
     return 0
 
 
+def slice_trace_cmd(args: argparse.Namespace) -> int:
+    """Compute a backward dynamic slice and embed it into a copy of the trace."""
+    from focustracer.core.slicer import slice_trace, annotate_trace_with_slice, slice_result_to_dicts
+
+    trace_file = args.trace_file
+    at_exception = args.at_exception or not args.at
+
+    try:
+        model, result = slice_trace(
+            trace_file,
+            at_exception=at_exception,
+            at=args.at,
+            include_control=not args.no_control,
+        )
+    except FileNotFoundError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"[!] Slice failed: {exc}", file=sys.stderr)
+        return 1
+
+    if not any(step.event_id is not None and (step.uses or step.defs) for step in model.steps):
+        print(
+            "[!] This trace has no reads — slicing needs a detailed schema>=2.3 trace.\n"
+            "    Re-run: focustracer run --detail detailed --schema-version 2.3 ...",
+            file=sys.stderr,
+        )
+        return 1
+
+    out_path = annotate_trace_with_slice(trace_file, model, result, args.output)
+
+    if not args.no_validate:
+        from focustracer.validate.validator import validate_xml_against_xsd
+        is_valid, errors = validate_xml_against_xsd(out_path)
+        if not is_valid:
+            print(f"[!] Sliced XML failed XSD validation: {out_path}", file=sys.stderr)
+            for err in errors:
+                print(f"  - {err}", file=sys.stderr)
+            return 1
+
+    nodes = slice_result_to_dicts(model, result)
+    print(f"[*] Criterion: {result.criterion_label}")
+    print(f"[*] Slice: {len(nodes)} statement(s)"
+          f"  (control {'on' if result.include_control else 'off'})")
+    print("-" * 60)
+    for d in nodes:
+        marker = {"criterion": "◆", "control": "▸", "data": "·"}.get(d["dependency"], " ")
+        fn = d["function"] or "?"
+        print(f"  {marker} L{d['line']:<4} {fn:<14} {d['source']}")
+    print("-" * 60)
+    print(f"[*] Sliced trace written to {out_path}")
+    print("[*] XML validation: ok" if not args.no_validate else "")
+    return 0
+
+
 def launch_gui(args: argparse.Namespace) -> int:
     """Start the FocusTracer web UI (FastAPI + Uvicorn)."""
     import webbrowser
@@ -1067,6 +1158,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         return run_trace(args)
     if args.command == "load":
         return load_trace(args)
+    if args.command == "slice":
+        return slice_trace_cmd(args)
     parser.print_help()
     return 1
 

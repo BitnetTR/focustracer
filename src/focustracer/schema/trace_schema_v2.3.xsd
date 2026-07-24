@@ -694,9 +694,13 @@
   </xs:complexType>
 
   <xs:complexType name="SliceNodeType">
-    <xs:attribute name="event_id" type="xs:nonNegativeInteger" use="required"/>
-    <xs:attribute name="line" type="xs:nonNegativeInteger" use="optional"/>
+    <!-- line is required; event_id is optional (synthetic loop-header nodes have no event). -->
+    <xs:attribute name="line" type="xs:nonNegativeInteger" use="required"/>
+    <xs:attribute name="event_id" type="xs:nonNegativeInteger" use="optional"/>
+    <xs:attribute name="function" type="xs:string" use="optional"/>
+    <xs:attribute name="file" type="xs:string" use="optional"/>
     <xs:attribute name="dependency" type="SliceDependencyEnum" use="optional"/>
+    <xs:attribute name="source" type="xs:string" use="optional"/>
   </xs:complexType>
 
   <xs:simpleType name="SliceDependencyEnum">

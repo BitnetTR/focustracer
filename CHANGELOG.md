@@ -1,5 +1,48 @@
 # Changelog
 
+## [1.2.0] — 2026-07-24 — `slice` komutu: backward dynamic slicing
+
+KIO2 dynamic slicing fazı 2. Kaydedilmiş bir trace üzerinde, bir *kriterden*
+(hata noktası veya değişken) geriye doğru, o değeri gerçekten etkileyen
+ifadeleri çıkaran backward dynamic slice — veri + kontrol bağımlılığı
+(Korel & Laski 1988; Agrawal & Horgan 1990).
+
+### Added
+- **`focustracer slice <trace.xml>`** CLI komutu:
+  - `--at-exception`: en içteki exception'ın hata satırından slice (root-cause).
+    `--at` verilmezse varsayılan.
+  - `--at [FILE:]LINE[:VAR]`: belirli bir değer için slice (örn. `app.py:42:total`).
+  - `--no-control`: yalnızca veri bağımlılığı.
+  - `--output`: çıktı yolu (varsayılan `<trace>.sliced.xml`, non-destructive).
+  - Sonuç `<slice>` elementi olarak XML'e gömülür ve v2.3 XSD'ye karşı doğrulanır.
+  - Terminal çıktısı: `◆` kriter, `▸` kontrol, `·` veri.
+- **`core/slicer.py`** — slicing motoru:
+  - Trace'i frame-farkındalıklı lineer *execution history*'ye düzleştirir.
+    Her adımın `uses`'ı `<reads>`'ten, `defs`'i satırın `ast` parse'ından
+    (Store + AugAssign target) gelir — `<delta>` kullanılmaz, böylece delta'nın
+    bir-event kayması slicing'i etkilemez. Loop header'ları sentezlenir
+    (loop target = def, iterable = use).
+  - İleri geçişte her use'un *reaching definition*'ı bulunur (aynı frame'de en
+    son def). Parametreler in-frame def yoksa çağrı yerine bağlanır
+    (interprocedural). Kontrol bağımlılığı, kaynak AST'sinden en yakın çevreleyen
+    `if`/`for`/`while` header'ına yapısal olarak bağlanır.
+  - Kriterden geriye erişilebilirlik = slice.
+- `schema/trace_schema_v2.3.xsd` (iki kopya): `SliceNodeType` gerçekçileştirildi
+  (`line` zorunlu, `event_id` opsiyonel — sentetik loop header düğümleri için;
+  `function`/`source` opsiyonel attribute'lar okunabilirlik için). `<slice>`
+  elementi henüz kullanılmamıştı, değişiklik geriye uyumlu.
+- `tests/test_slicer.py`: def/use + control-map birim testleri, kesinlik
+  (alakasız ifade dışlanır), kontrol bağımlılığı, `--no-control`, exception
+  root-cause, ve sliced XML'in v2.3 doğrulaması.
+
+### Known limitations
+- Slicing **statement-seviyesinde** (standart yaklaşım): interprocedural parametre
+  bağlantısı çağrı yerinin tüm okumalarını çeker (sound over-approximation) —
+  örn. `total += divide(10, v)` çağrısında `b←v` için `total` de dahil olur.
+  Değişken-seviyesi kesinlik sonraki bir iş.
+- Kontrol bağımlılığı yapısal (lexical nesting) — yapılandırılmış Python için
+  doğru; post-dominator tabanlı tam control-dependence değil.
+
 ## [1.1.0] — 2026-07-24 — XSD v2.3 + reads (use-set) yakalama
 
 KIO2 dynamic slicing için ilk faz. Backward slicing, çalışan her satırın

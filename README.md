@@ -124,6 +124,26 @@ python -m focustracer run \
   --hint "Trace the worker path and multiplication logic"
 ```
 
+### `slice`
+
+Computes a **backward dynamic slice** over a saved trace: the statements that
+actually influenced a value on this run (data + control dependencies). Needs a
+`detailed`, schema ≥ 2.3 trace (the default for `run`). Writes the slice into a
+`<slice>` element in `<trace>.sliced.xml` and re-validates against the v2.3 XSD.
+
+```bash
+# Slice from the innermost exception's failing line (root-cause):
+python -m focustracer slice output/sample_trace.xml --at-exception
+
+# Slice a specific value: which statements produced `total` at line 42?
+python -m focustracer slice output/sample_trace.xml --at app.py:42:total
+
+# Data dependencies only (skip control):
+python -m focustracer slice output/sample_trace.xml --at-exception --no-control
+```
+
+Output markers: `◆` criterion, `▸` control dependency, `·` data dependency.
+
 ## Using Local Ollama Reliably
 
 Recommended bridge flow for CLI-only environments:
@@ -187,7 +207,8 @@ with TraceContext(
 - `core/targeting.py`: target manifest and code inventory helpers
 - `agent/ollama_client.py`: Ollama health, model listing, target suggestion
 - `agent/opencode_client.py`: OpenCode CLI health and target suggestion
-- `cli.py`: `check-agent`, `suggest-targets`, `run`
+- `core/slicer.py`: backward dynamic slicing (data + control dependency) over a trace
+- `cli.py`: `check-agent`, `suggest-targets`, `run`, `load`, `slice`
 
 ## CLI Reference (Detaylı)
 
