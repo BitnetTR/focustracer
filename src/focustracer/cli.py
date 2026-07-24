@@ -1051,6 +1051,23 @@ def run_trace(args: argparse.Namespace) -> int:
         )
 
     merged_manifest = manual_manifest.merge(ai_manifest)
+
+    # No function targets and no LLM selection → trace every function defined in
+    # the target script. Removes the "must name a function" friction; the recorder
+    # already supports untargeted tracing, this just scopes it to the user's script.
+    if not merged_manifest.functions and not args.auto_targets:
+        all_functions = list(inventory.functions)
+        if all_functions:
+            print(
+                f"[*] No function targets given — tracing all {len(all_functions)} "
+                f"function(s) defined in {Path(args.target_script).name}. "
+                f"Use --function to focus.",
+                file=sys.stderr,
+            )
+            merged_manifest = merged_manifest.merge(
+                TargetManifest(functions=all_functions)
+            )
+
     return _execute_trace_with_manifest(args, merged_manifest)
 
 

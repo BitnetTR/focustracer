@@ -103,6 +103,16 @@ python -m focustracer suggest-targets \
 
 Runs the target script, writes an XML trace, writes the merged target manifest next to it, and validates the XML.
 
+**No `--function`? It traces everything in the script.** If you give no function
+targets (and don't use `--auto-targets`), FocusTracer traces every function
+defined in the target script — no need to name them:
+
+```bash
+python -m focustracer run --target-script app.py           # trace all functions in app.py
+```
+
+Name functions to focus the trace (smaller output on large programs):
+
 ```bash
 python -m focustracer run \
   --target-script tests/fixtures/cli_sample_app.py \

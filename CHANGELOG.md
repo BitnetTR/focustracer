@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.4.0] — 2026-07-24 — `run`: fonksiyon vermeden otomatik trace-all
+
+### Changed
+- **`focustracer run script.py` artık `--function` gerektirmiyor.** Fonksiyon
+  hedefi verilmezse (ve `--auto-targets` kullanılmazsa), script'te tanımlı tüm
+  fonksiyonlar otomatik trace edilir — kullanıcı fonksiyon ismi girmek zorunda
+  değil. Recorder zaten hedefsiz tracing'i destekliyordu; bu değişiklik onu
+  kullanıcının script'iyle sınırlayıp (stdlib/3rd-party değil) CLI'deki "en az
+  bir hedef gerekli" engelini kaldırıyor. Odaklamak için `--function` hâlâ
+  kullanılabilir (büyük programlarda daha küçük çıktı).
+  Bilgilendirici bir not yazdırılır: "tracing all N function(s)…".
+
 ## [1.3.1] — 2026-07-24 — GUI çıktı düzeltmeleri + slice UX
 
 Kullanıcı geri bildirimi üzerine düzeltmeler.
