@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What This Project Does
 
-FocusTracer is an LLM-guided dynamic slicing and XML trace pipeline for Python debugging. It captures execution traces at runtime (zero source-code modification) and uses LLMs (Ollama or OpenCode) to intelligently suggest which functions to instrument.
+FocusTracer is an LLM-guided dynamic slicing and XML trace pipeline for Python debugging. It captures execution traces at runtime (zero source-code modification) and uses LLMs (Ollama or OpenCode) to intelligently suggest which functions to instrument. On top of the recorded trace it provides post-mortem debugging primitives: backward dynamic slicing, LLM root-cause explanation, reverse execution (state rewind), and interactive forward/backward replay.
+
+In the AI4SWENG program, FocusTracer is the trace engine for **KIO2** ("Bug Locate & Fix: Reverse Execution & Dynamic Slicing"). Per the finalized D2.6 requirements, FocusTracer directly implements FR-KIO2-07 (trace recorder) and feeds FR-KIO2-02 (interactive forward/backward replay) and FR-KIO2-04 (post-mortem inspection). LLM-based *fix generation* is out of KIO2 scope (it belongs to KIO7); the `explain` command stays as a standalone convenience, and in the KIO2 integration the LLM step is a hand-off to KIO7.
 
 ## Commands
 
@@ -15,12 +17,22 @@ pip install -e .
 
 ### Running the CLI
 ```bash
-focustracer check-agent                          # verify LLM connectivity
-focustracer suggest-targets <script.py> --hint "describe the bug"
-focustracer run <script.py> --target mymodule.myfunction
-focustracer run <script.py> --targets-file targets.json
-focustracer gui                                  # launch web UI on port 8765
+focustracer check-agent --agent ollama --model qwen2.5:3b   # verify LLM connectivity
+focustracer install                                          # install/manage agents, pull Ollama models
+focustracer suggest-targets --target-script <script.py> --hint "describe the bug"
+focustracer run --target-script <script.py> --function myfunc --detail detailed --schema-version 2.3
+focustracer run --target-script <script.py>                  # no --function ⇒ trace all functions
+focustracer load <trace.xml>                                 # display a saved trace (post-mortem)
+focustracer slice <trace.xml> --at-exception                 # backward dynamic slice (root-cause)
+focustracer explain <trace.xml> --at-exception               # LLM root-cause from the slice
+focustracer reverse <trace.xml> --at-exception --step-back 6 # reverse execution / state rewind
+focustracer replay <trace.xml> --seq 0 --step 3 --window 2   # interactive forward/backward stepping
+focustracer gui                                              # launch web UI
 ```
+
+Post-mortem commands (`slice`, `explain`, `reverse`, `replay`) need a `detailed`,
+schema ≥ 2.3 trace (the default for `run`). `slice`/`explain`/`reverse` accept a
+criterion (`--at [FILE:]LINE[:VAR]`) or default to the recorded exception.
 
 ### Tests
 ```bash
@@ -61,7 +73,17 @@ npm run dev     # dev server
 
 - **`targeting.py` — `TargetManifest`**: Represents the set of trace targets (functions, files, lines, threads). Supports union merging: manual targets + AI-suggested targets are deduplicated and merged. Serialized as `.targets.json`.
 
-- **`schema.py`**: XML schema builders for v1, v2, and v2.1 output formats.
+- **`schema.py`**: XML schema builders for v1, v2, v2.1, v2.2, and v2.3 output formats. v2.3 adds `reads` (use-set) capture required for dynamic slicing.
+
+- **`slicer.py`**: Backward dynamic slicing over a saved trace — data + control dependencies from a criterion (a value or the crash). Needs a schema ≥ 2.3, `detailed` trace. Writes a `<slice>` element into `<trace>.sliced.xml`.
+
+- **`explain.py`**: Builds a value-annotated slice context and drives LLM root-cause explanation. The model is given the *slice*, not the raw trace. Standalone convenience — in the KIO2 integration the LLM step hands off to KIO7.
+
+- **`reverse.py` — `Reconstructor`**: Reverse execution / state rewind. Reconstructs per-frame observable state at each executed line from the trace's reversible deltas; `reverse_trace` returns state at a point plus N steps back. Read-only, no re-run.
+
+- **`replay.py` — `ReplaySession`**: Interactive replay — a movable cursor over the reconstructed timeline (`step_forward`/`step_back`/`jump_to_*`/`state`/`def_of`/`to_dict`). Reuses `reverse.Reconstructor`. Read-only. Realises FR-KIO2-02 (forward/backward navigation with state inspection).
+
+- **`loader.py` — `TraceLoader`/`TraceDocument`**: Parses a saved trace XML into an in-memory document consumed by slicer/reverse/replay.
 
 ### AI Agent Layer (`src/focustracer/agent/`)
 
@@ -73,15 +95,15 @@ Both agents implement: target suggestion from code inventory, code analysis, and
 
 ### CLI (`src/focustracer/cli.py`)
 
-Entry point with five commands: `check-agent`, `suggest-targets`, `run`, `gui`, `install`. The `suggest-targets` command builds a code inventory from the target script, sends it to the LLM with the user hint, and returns a `TargetManifest`. The `run` command merges manual `--target` flags with any `--targets-file` before patching.
+Entry point with commands: `check-agent`, `install`, `suggest-targets`, `run`, `load`, `slice`, `explain`, `reverse`, `replay`, `gui`. The `suggest-targets` command builds a code inventory from the target script, sends it to the LLM with the user hint, and returns a `TargetManifest`. The `run` command merges manual `--function`/`--file`/`--line` targets (and `--auto-targets` AI suggestions) before patching. The post-mortem commands (`slice`, `explain`, `reverse`, `replay`) operate on a saved trace and never re-run the program.
 
 ### Web GUI (`src/focustracer/gui/`)
 
-FastAPI backend + React/Vite frontend. Jobs are queued in-memory; real-time log streaming uses SSE. Settings persisted to `~/.focustracer/settings.json`. Frontend is pre-built to `dist/` and served as static files.
+FastAPI backend + React/Vite frontend. Jobs are queued in-memory; real-time log streaming uses SSE. Settings persisted to `~/.focustracer/settings.json`. Frontend is pre-built to `dist/` and served as static files. The GUI has **parity with the CLI**: opening a trace under *Trace Logs* exposes **Slice / Reverse / Replay / Explain** tabs (endpoints `POST /api/trace/{slice,reverse,replay,explain}`; the replay endpoint is stateless — the client keeps `seq` and re-POSTs with `seq±1`). Settings › AI Agent has a **Models** section that lists and pulls Ollama models with live progress (`GET /api/ollama/models`, `POST /api/ollama/pull`).
 
 ### Validation (`src/focustracer/validate/`)
 
-XSD schema validation against `schema/trace_schema_v2.1.xsd`. Skip with `--skip-validate`.
+XSD schema validation against the trace's schema version (v1 … v2.3) in `schema/`. Slicing requires v2.3. Skip with `--skip-validate`.
 
 ## Key Design Invariants
 

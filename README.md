@@ -229,7 +229,9 @@ Realises FR-KIO2-02 (forward/backward navigation with state inspection).
 
 > **GUI parity:** `slice`, `explain`, `reverse`, and `replay` are all available
 > from the web UI too — open any trace under **Trace Logs** and use the
-> **Slice / Reverse / Replay / Explain** tabs. Launch with `focustracer gui`.
+> **Slice / Reverse / Replay / Explain** tabs. You can also pull Ollama models
+> from **Settings › AI Agent › Models** with live progress. Launch with
+> `focustracer gui`.
 
 ## Using Local Ollama Reliably
 
