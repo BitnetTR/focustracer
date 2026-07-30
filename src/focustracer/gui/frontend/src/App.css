@@ -579,3 +579,97 @@
 }
 .status-bar.success { border-color: rgba(16,217,139,0.3); color: var(--accent-green); }
 .status-bar.error { border-color: rgba(255,77,109,0.3); color: var(--accent-red); }
+
+/* ── Analyze modal (Slice / Reverse / Replay / Explain) ───────────────────── */
+.analyze-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 14px 0;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-wrap: wrap;
+}
+.analyze-tab {
+  display: flex; align-items: center; gap: 5px;
+  padding: 6px 12px;
+  font-size: 12px; font-weight: 600;
+  color: var(--text-muted);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+.analyze-tab:hover { color: var(--text-primary); }
+.analyze-tab.active { color: var(--accent-cyan); border-bottom-color: var(--accent-cyan); }
+
+.analyze-pane { display: flex; flex-direction: column; gap: 10px; }
+.analyze-meta { font-size: 12px; color: var(--text-secondary); }
+.analyze-meta code { font-family: 'JetBrains Mono', monospace; color: var(--accent-cyan); }
+.analyze-sub { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); margin-top: 6px; }
+.analyze-err {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; color: #f87171;
+  background: rgba(248,113,113,0.08);
+  border: 1px solid rgba(248,113,113,0.25);
+  border-radius: var(--radius-sm, 6px);
+  padding: 8px 10px;
+}
+.checkbox-row { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary); }
+
+/* state snapshot table */
+.state-grid { display: flex; flex-direction: column; gap: 2px; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.state-row { display: grid; grid-template-columns: minmax(80px,180px) 1fr auto; gap: 10px; padding: 3px 8px; border-radius: 4px; }
+.state-row:nth-child(odd) { background: var(--bg-card); }
+.state-name { color: var(--accent-cyan); }
+.state-val { color: var(--text-primary); white-space: pre-wrap; word-break: break-all; }
+.state-type { color: var(--text-muted); font-size: 11px; }
+
+/* slice / timeline rows */
+.slice-list { display: flex; flex-direction: column; gap: 1px; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+.slice-row { display: flex; gap: 8px; align-items: baseline; padding: 3px 8px; border-radius: 4px; }
+.slice-row:hover { background: var(--bg-card); }
+.slice-row.cursor-row { background: rgba(0,212,255,0.10); }
+.slice-mark { width: 16px; color: var(--accent-cyan); flex-shrink: 0; }
+.slice-line { color: var(--text-muted); min-width: 40px; flex-shrink: 0; }
+.slice-fn { color: #c084fc; min-width: 80px; flex-shrink: 0; }
+.slice-src { color: var(--text-secondary); }
+.slice-undo { color: var(--text-muted); font-style: italic; }
+.dep-criterion .slice-src { color: var(--text-primary); font-weight: 600; }
+.dep-control .slice-mark { color: #fbbf24; }
+
+/* replay navigator */
+.replay-nav { display: flex; align-items: center; gap: 6px; }
+.replay-pos { font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-secondary); min-width: 90px; text-align: center; }
+
+.explain-out {
+  font-size: 13px; line-height: 1.6; color: var(--text-primary);
+  white-space: pre-wrap; background: var(--bg-card);
+  border: 1px solid var(--border-subtle); border-radius: var(--radius-sm, 6px);
+  padding: 12px;
+}
+
+/* ── Ollama model management (Settings › Agent) ───────────────────────────── */
+.model-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 8px; border-radius: 6px;
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  font-size: 12px;
+}
+.model-name { font-family: 'JetBrains Mono', monospace; color: var(--text-primary); flex: 1; }
+.model-size { color: var(--text-muted); font-size: 11px; }
+.model-chip {
+  font-size: 11px; padding: 3px 9px; border-radius: 999px;
+  background: transparent; color: var(--accent-cyan);
+  border: 1px solid var(--border-medium); cursor: pointer;
+}
+.model-chip:hover:not(:disabled) { background: rgba(0,212,255,0.08); }
+.model-chip:disabled { opacity: .5; cursor: default; }
+.pull-status {
+  display: flex; align-items: center; gap: 6px;
+  margin-top: 8px; padding: 6px 10px; border-radius: 6px;
+  font-family: 'JetBrains Mono', monospace; font-size: 11px;
+  color: var(--text-secondary); background: var(--bg-secondary);
+  border: 1px solid var(--border-subtle);
+}
+
+.spinning { animation: ft-spin 0.9s linear infinite; }
+@keyframes ft-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }

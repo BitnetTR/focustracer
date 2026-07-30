@@ -20,6 +20,8 @@ src/focustracer/core/explain.py
 src/focustracer/core/loader.py
 src/focustracer/core/patcher.py
 src/focustracer/core/recorder.py
+src/focustracer/core/replay.py
+src/focustracer/core/reverse.py
 src/focustracer/core/schema.py
 src/focustracer/core/slicer.py
 src/focustracer/core/targeting.py
@@ -32,6 +34,8 @@ src/focustracer/gui/frontend/dist/index.html
 src/focustracer/gui/frontend/dist/testwrite
 src/focustracer/gui/frontend/dist/assets/index-BdYYZ8Xt.css
 src/focustracer/gui/frontend/dist/assets/index-CLnJtgrZ.js
+src/focustracer/gui/frontend/dist/assets/index-DyjGEtG-.js
+src/focustracer/gui/frontend/dist/assets/index-iBRINwpP.css
 src/focustracer/schema/trace_schema.json
 src/focustracer/schema/trace_schema_v1.xsd
 src/focustracer/schema/trace_schema_v2.1.xsd
@@ -47,5 +51,7 @@ tests/test_hook_threading.py
 tests/test_loader.py
 tests/test_loop_compaction.py
 tests/test_reads_capture.py
+tests/test_replay.py
+tests/test_reverse.py
 tests/test_slicer.py
 tests/test_xsd_validation.py

@@ -4,10 +4,11 @@ import CodeMirror from '@uiw/react-codemirror'
 import { python } from '@codemirror/lang-python'
 import { oneDark } from '@codemirror/theme-one-dark'
 import {
-  FolderOpen, Settings, Play, Zap, ChevronRight, ChevronDown,
+  FolderOpen, Settings, Play, Zap, ChevronRight, ChevronDown, ChevronLeft,
   FileCode2, X, RefreshCw, CheckCircle2, XCircle, AlertCircle,
   Cpu, Terminal, Download, Eye, Clock, FileText, Loader2,
-  Folder, LayoutGrid, Activity, GitBranch, Server, Gauge, Flame
+  Folder, LayoutGrid, Activity, GitBranch, Server, Gauge, Flame,
+  SkipBack, SkipForward, Sparkles, Scissors
 } from 'lucide-react'
 import { api, subscribeJobStream } from './api.js'
 import './App.css'
@@ -152,6 +153,37 @@ function SettingsModal({ onClose, settings, onSave }) {
   const [sysLoading, setSysLoading] = useState(false)
   const [metrics, setMetrics] = useState(null)
   const [metricsLoading, setMetricsLoading] = useState(false)
+  // Ollama model management
+  const [models, setModels] = useState(null)
+  const [pullName, setPullName] = useState('')
+  const [pulling, setPulling] = useState(false)
+  const [pullMsg, setPullMsg] = useState(null)
+  const pullUnsub = useRef(null)
+
+  const SUGGESTED_MODELS = ['qwen2.5:3b', 'qwen2.5-coder:3b', 'qwen2.5-coder:7b', 'llama3.2:3b']
+
+  const loadModels = useCallback(async () => {
+    try { setModels((await api.ollamaModels()).models || []) } catch { setModels([]) }
+  }, [])
+
+  const pullModel = async (name) => {
+    const model = (name || pullName).trim()
+    if (!model || pulling) return
+    setPulling(true); setPullMsg(`Starting pull for ${model}…`)
+    try {
+      const { job_id } = await api.pullModel({ model, ollama_url: form.ollama_url })
+      if (pullUnsub.current) pullUnsub.current()
+      pullUnsub.current = subscribeJobStream(
+        job_id,
+        (entry) => setPullMsg(entry.message),
+        (status) => {
+          setPulling(false)
+          setPullMsg(status === 'done' ? `✅ ${model} installed` : '❌ Pull failed')
+          loadModels(); checkAgents()
+        }
+      )
+    } catch (e) { setPulling(false); setPullMsg(`❌ ${e.message || e}`) }
+  }
 
   const checkAgents = async () => {
     setChecking(true)
@@ -174,6 +206,8 @@ function SettingsModal({ onClose, settings, onSave }) {
   useEffect(() => { checkAgents() }, [])
   useEffect(() => { if (activeTab === 'hardware' && !sysInfo) loadSysInfo() }, [activeTab, sysInfo])
   useEffect(() => { if (activeTab === 'metrics') loadMetrics() }, [activeTab])
+  useEffect(() => { if (activeTab === 'agent' && form.agent === 'ollama' && models === null) loadModels() }, [activeTab, form.agent, models, loadModels])
+  useEffect(() => () => { if (pullUnsub.current) pullUnsub.current() }, [])
 
   const save = async () => {
     const saved = await api.saveSettings(form)
@@ -274,6 +308,58 @@ function SettingsModal({ onClose, settings, onSave }) {
                   </div>
                 ) : <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Loading…</div>}
               </div>
+
+              {/* ── Ollama Models (install / pull) ── */}
+              {form.agent === 'ollama' && (
+                <div className="section">
+                  <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+                    <label className="label" style={{ marginBottom: 0 }}>Models</label>
+                    <button className="btn btn-ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={loadModels}>
+                      <RefreshCw size={12} /> Refresh
+                    </button>
+                  </div>
+
+                  {/* Installed models */}
+                  {models === null
+                    ? <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Loading…</div>
+                    : models.length === 0
+                      ? <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>No models installed. Pull one below.</div>
+                      : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+                          {models.map(m => (
+                            <div key={m.name} className="model-row">
+                              <span className="model-name">{m.name}</span>
+                              <span className="model-size">{m.size_gb} GB</span>
+                              {form.model === m.name
+                                ? <span className="badge badge-success"><CheckCircle2 size={10} /> in use</span>
+                                : <button className="btn btn-ghost" style={{ padding: '1px 8px', fontSize: 11 }} onClick={() => set('model', m.name)}>Use</button>}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                  {/* Pull a new model */}
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input className="input" style={{ flex: 1 }} placeholder="model to pull, e.g. qwen2.5-coder:3b"
+                      value={pullName} onChange={e => setPullName(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && pullModel()} disabled={pulling} />
+                    <button className="btn btn-primary" style={{ padding: '6px 12px' }} onClick={() => pullModel()} disabled={pulling || !pullName.trim()}>
+                      {pulling ? <Loader2 size={13} className="spinning" /> : <Download size={13} />} Pull
+                    </button>
+                  </div>
+
+                  {/* Suggested models */}
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                    {SUGGESTED_MODELS.map(m => (
+                      <button key={m} className="model-chip" onClick={() => { setPullName(m); pullModel(m) }} disabled={pulling}>
+                        + {m}
+                      </button>
+                    ))}
+                  </div>
+
+                  {pullMsg && <div className="pull-status">{pulling && <Loader2 size={12} className="spinning" />} {pullMsg}</div>}
+                </div>
+              )}
             </>
           )}
 
@@ -409,14 +495,215 @@ function SettingsModal({ onClose, settings, onSave }) {
 }
 
 // ─── XML Viewer Modal ────────────────────────────────────────────────────────
-function XmlModal({ file, onClose }) {
+// ─── Analyze Modal (XML / Slice / Reverse / Replay / Explain) ────────────────
+const DEP_MARK = { criterion: '◆', control: '▸', data: '·' }
+
+function StateTable({ state }) {
+  const entries = Object.entries(state || {})
+  if (!entries.length) return <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>(no variables in scope)</div>
+  return (
+    <div className="state-grid">
+      {entries.map(([name, v]) => (
+        <div key={name} className="state-row">
+          <span className="state-name">{name}</span>
+          <span className="state-val">{v.value}</span>
+          <span className="state-type">{v.type}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function XmlTab({ path }) {
   const [content, setContent] = useState(null)
   const [loading, setLoading] = useState(true)
-
   useEffect(() => {
-    api.getOutput(file.path).then(d => { setContent(d.content); setLoading(false) }).catch(() => setLoading(false))
-  }, [file])
+    setLoading(true)
+    api.getOutput(path).then(d => { setContent(d.content); setLoading(false) }).catch(() => setLoading(false))
+  }, [path])
+  if (loading) return <div className="flex items-center gap-2" style={{ color: 'var(--text-muted)' }}><div className="spinner" /> Loading…</div>
+  return <pre className="xml-content">{content || 'Empty file'}</pre>
+}
 
+function CriterionInput({ at, setAt }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+      <div style={{ flex: 1, minWidth: 180 }}>
+        <label className="label">Criterion (blank = crash)</label>
+        <input className="input" placeholder="[file.py:]LINE[:var]  e.g. 42:total" value={at} onChange={e => setAt(e.target.value)} />
+      </div>
+    </div>
+  )
+}
+
+function SliceTab({ path }) {
+  const [at, setAt] = useState('')
+  const [control, setControl] = useState(true)
+  const [res, setRes] = useState(null)
+  const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const run = async () => {
+    setBusy(true); setErr(null); setRes(null)
+    try {
+      const d = await api.sliceTrace({ path, at: at || null, at_exception: !at, include_control: control })
+      setRes(d)
+    } catch (e) { setErr(String(e.message || e)) } finally { setBusy(false) }
+  }
+  return (
+    <div className="analyze-pane">
+      <CriterionInput at={at} setAt={setAt} />
+      <label className="checkbox-row"><input type="checkbox" checked={control} onChange={e => setControl(e.target.checked)} /> include control dependencies</label>
+      <button className="btn btn-primary" onClick={run} disabled={busy}>{busy ? <><div className="spinner" /> Slicing…</> : <><Scissors size={13} /> Compute slice</>}</button>
+      {err && <div className="analyze-err"><AlertCircle size={13} /> {err}</div>}
+      {res && (
+        <div>
+          <div className="analyze-meta">Criterion: <b>{res.criterion}</b> · {res.nodes.length} statement(s) · control {res.include_control ? 'on' : 'off'}</div>
+          <div className="slice-list">
+            {res.nodes.map((n, i) => (
+              <div key={i} className={`slice-row dep-${n.dependency}`}>
+                <span className="slice-mark">{DEP_MARK[n.dependency] || ' '}</span>
+                <span className="slice-line">L{n.line}</span>
+                <span className="slice-fn">{n.function || '?'}</span>
+                <span className="slice-src">{n.source}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ReverseTab({ path }) {
+  const [atLine, setAtLine] = useState('')
+  const [stepBack, setStepBack] = useState(6)
+  const [res, setRes] = useState(null)
+  const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const run = async () => {
+    setBusy(true); setErr(null); setRes(null)
+    try {
+      const body = { path, step_back: Number(stepBack) }
+      if (atLine) { body.at_line = Number(atLine); body.at_exception = false } else { body.at_exception = true }
+      const d = await api.reverseTrace(body)
+      setRes(d)
+    } catch (e) { setErr(String(e.message || e)) } finally { setBusy(false) }
+  }
+  return (
+    <div className="analyze-pane">
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+        <div style={{ flex: 1 }}><label className="label">At line (blank = crash)</label><input className="input" placeholder="e.g. 42" value={atLine} onChange={e => setAtLine(e.target.value)} /></div>
+        <div style={{ width: 110 }}><label className="label">Steps back</label><input className="input" type="number" value={stepBack} onChange={e => setStepBack(e.target.value)} /></div>
+      </div>
+      <button className="btn btn-primary" onClick={run} disabled={busy}>{busy ? <><div className="spinner" /> Rewinding…</> : <><RefreshCw size={13} /> Reconstruct &amp; rewind</>}</button>
+      {err && <div className="analyze-err"><AlertCircle size={13} /> {err}</div>}
+      {res && (
+        <div>
+          <div className="analyze-meta">State @ <b>{res.criterion}</b> — {res.target.function} L{res.target.line}: <code>{res.target.source}</code></div>
+          <StateTable state={res.target.state} />
+          <div className="analyze-sub">◀ Reverse timeline</div>
+          <div className="slice-list">
+            {res.timeline.filter(s => s.step < 0).map((s, i) => (
+              <div key={i} className="slice-row">
+                <span className="slice-mark">{s.step}</span>
+                <span className="slice-fn">{s.function}</span>
+                <span className="slice-src">L{s.line}: {s.source}</span>
+                {(s.undo || []).length > 0 && <span className="slice-undo">{s.undo.map(u => `${u.name}: ${u.to}→${u.from}`).join(', ')}</span>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ReplayTab({ path }) {
+  const [state, setState] = useState(null)
+  const [err, setErr] = useState(null)
+  const [defVar, setDefVar] = useState('')
+  const load = useCallback(async (body) => {
+    setErr(null)
+    try { setState(await api.replayTrace({ path, window: 4, ...body, def_var: defVar || null })) }
+    catch (e) { setErr(String(e.message || e)) }
+  }, [path, defVar])
+  useEffect(() => { load({ seq: 0 }) }, [path])  // eslint-disable-line
+  const go = (seq) => load({ seq })
+  if (err) return <div className="analyze-pane"><div className="analyze-err"><AlertCircle size={13} /> {err}</div></div>
+  if (!state) return <div className="analyze-pane"><div className="spinner" /></div>
+  const c = state.current
+  return (
+    <div className="analyze-pane">
+      <div className="replay-nav">
+        <button className="btn btn-ghost" onClick={() => go(0)} disabled={!state.can_back} title="Start"><SkipBack size={14} /></button>
+        <button className="btn btn-ghost" onClick={() => go(state.cursor - 1)} disabled={!state.can_back} title="Step back"><ChevronLeft size={14} /></button>
+        <span className="replay-pos">#{state.cursor} / {state.total - 1}</span>
+        <button className="btn btn-ghost" onClick={() => go(state.cursor + 1)} disabled={!state.can_forward} title="Step forward"><ChevronRight size={14} /></button>
+        <button className="btn btn-ghost" onClick={() => go(state.total - 1)} disabled={!state.can_forward} title="End"><SkipForward size={14} /></button>
+        <button className="btn btn-ghost" onClick={() => load({ at_exception: true })} title="Jump to crash"><Flame size={13} /> crash</button>
+      </div>
+      <div className="analyze-meta">{c.function} <b>L{c.line}</b>: <code>{c.source}</code></div>
+      <StateTable state={c.state} />
+      <div className="analyze-sub">Timeline</div>
+      <div className="slice-list">
+        {state.timeline.map((e, i) => (
+          <div key={i} className={`slice-row ${e.is_cursor ? 'cursor-row' : ''}`} onClick={() => go(e.seq)} style={{ cursor: 'pointer' }}>
+            <span className="slice-mark">{e.is_cursor ? '▶' : ''}</span>
+            <span className="slice-line">#{e.seq}</span>
+            <span className="slice-fn">{e.function}</span>
+            <span className="slice-src">L{e.line}: {e.source}{(e.change || []).length > 0 && <em className="slice-undo"> {e.change.map(u => `${u.name}: ${u.from}→${u.to}`).join(', ')}</em>}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 8 }}>
+        <div style={{ flex: 1 }}><label className="label">def-use: which statement defined…</label><input className="input" placeholder="variable name" value={defVar} onChange={e => setDefVar(e.target.value)} /></div>
+        <button className="btn btn-ghost" onClick={() => go(state.cursor)}><GitBranch size={13} /> Trace def</button>
+      </div>
+      {state.def_of && <div className="analyze-meta">↳ <b>{state.def_of.name}</b> defined at #{state.def_of.seq} {state.def_of.function} L{state.def_of.line}: <code>{state.def_of.source}</code> ({state.def_of.from ?? '·'} → {state.def_of.to})</div>}
+      {defVar && state.def_of === null && <div className="analyze-meta">↳ '{defVar}' not defined at the cursor.</div>}
+    </div>
+  )
+}
+
+function ExplainTab({ path }) {
+  const [at, setAt] = useState('')
+  const [res, setRes] = useState(null)
+  const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [showCtx, setShowCtx] = useState(false)
+  const run = async () => {
+    setBusy(true); setErr(null); setRes(null)
+    try { setRes(await api.explainTrace({ path, at: at || null, at_exception: !at })) }
+    catch (e) { setErr(String(e.message || e)) } finally { setBusy(false) }
+  }
+  return (
+    <div className="analyze-pane">
+      <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>Slices at the crash (or a criterion you give) and asks the configured agent for a root-cause explanation. The model sees the <b>slice</b>, not the raw trace.</div>
+      <CriterionInput at={at} setAt={setAt} />
+      <button className="btn btn-primary" onClick={run} disabled={busy}>{busy ? <><div className="spinner" /> Explaining…</> : <><Sparkles size={13} /> Explain root cause</>}</button>
+      {err && <div className="analyze-err"><AlertCircle size={13} /> {err}</div>}
+      {res && !res.agent_ok && <div className="analyze-err"><AlertCircle size={13} /> Agent unreachable — showing the slice context that would be sent. (Start Ollama / set an agent in Settings.)</div>}
+      {res && res.explanation && <pre className="explain-out">{res.explanation}</pre>}
+      {res && (
+        <div>
+          <button className="btn btn-ghost" style={{ fontSize: 11 }} onClick={() => setShowCtx(s => !s)}>{showCtx ? 'Hide' : 'Show'} slice context</button>
+          {showCtx && <pre className="xml-content" style={{ maxHeight: 220 }}>{res.context}</pre>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const ANALYZE_TABS = [
+  { id: 'xml', label: 'XML', icon: FileText },
+  { id: 'slice', label: 'Slice', icon: Scissors },
+  { id: 'reverse', label: 'Reverse', icon: RefreshCw },
+  { id: 'replay', label: 'Replay', icon: Play },
+  { id: 'explain', label: 'Explain', icon: Sparkles },
+]
+
+function AnalyzeModal({ file, onClose }) {
+  const [tab, setTab] = useState('xml')
   return (
     <div className="xml-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <motion.div
@@ -434,11 +721,22 @@ function XmlModal({ file, onClose }) {
           </div>
           <button className="btn btn-ghost" style={{ padding: '4px' }} onClick={onClose}><X size={16} /></button>
         </div>
+        <div className="analyze-tabs">
+          {ANALYZE_TABS.map(t => {
+            const Icon = t.icon
+            return (
+              <button key={t.id} className={`analyze-tab ${tab === t.id ? 'active' : ''}`} onClick={() => setTab(t.id)}>
+                <Icon size={12} /> {t.label}
+              </button>
+            )
+          })}
+        </div>
         <div className="xml-modal-body">
-          {loading
-            ? <div className="flex items-center gap-2" style={{ color: 'var(--text-muted)' }}><div className="spinner" /> Loading…</div>
-            : <pre className="xml-content">{content || 'Empty file'}</pre>
-          }
+          {tab === 'xml' && <XmlTab path={file.path} />}
+          {tab === 'slice' && <SliceTab path={file.path} />}
+          {tab === 'reverse' && <ReverseTab path={file.path} />}
+          {tab === 'replay' && <ReplayTab path={file.path} />}
+          {tab === 'explain' && <ExplainTab path={file.path} />}
         </div>
       </motion.div>
     </div>
@@ -743,7 +1041,7 @@ function BottomPanel({ logEntries, projectRoot, refreshTrigger }) {
       </div>
 
       <AnimatePresence>
-        {viewFile && <XmlModal file={viewFile} onClose={() => setViewFile(null)} />}
+        {viewFile && <AnalyzeModal file={viewFile} onClose={() => setViewFile(null)} />}
       </AnimatePresence>
     </div>
   )
@@ -835,7 +1133,7 @@ export default function App() {
         <div className="topbar-logo">
           <div className="topbar-logo-icon">🔍</div>
           <span className="topbar-logo-name">FocusTracer</span>
-          <span className="topbar-subtitle">v1.0</span>
+          <span className="topbar-subtitle">v1.6</span>
         </div>
         <div className="topbar-project">
           <Folder size={12} style={{ color: '#fbbf24', flexShrink: 0 }} />

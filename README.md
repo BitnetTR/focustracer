@@ -175,6 +175,64 @@ python -m focustracer explain output/sample_trace.xml --at app.py:42:total --out
 The model answers with: (1) root cause, (2) the causal chain in plain language,
 (3) a concrete fix. `--show-context` prints the slice context and needs no agent.
 
+### `reverse`
+
+**Reverse execution / state rewind.** Reconstructs the observable program state
+at a point (the crash by default) and steps *backward* through the execution,
+watching values un-wind — all from the saved trace, no re-run. Read-only: it
+does not modify the trace.
+
+```bash
+# State at the crash, plus the reverse timeline:
+python -m focustracer reverse output/sample_trace.xml --at-exception --step-back 6
+
+# State at a specific event or line:
+python -m focustracer reverse output/sample_trace.xml --at-event 18
+python -m focustracer reverse output/sample_trace.xml --at-line 42 --function compute
+
+# Dump the reconstructed state(s) to JSON:
+python -m focustracer reverse output/sample_trace.xml --at-exception --json rewind.json
+```
+
+Example: at each backward step it shows what a variable *un-does*
+(`undo total: 12 → 6`), crossing call boundaries as it rewinds. Values are the
+observable (string) state each variable showed, not live objects.
+
+### `replay`
+
+**Interactive replay — step forward AND backward through a trace.** Where
+`reverse` is a one-shot rewind, `replay` is a *movable cursor* over the whole
+recorded timeline: seek to a point, step either direction, inspect the full
+observable state at the cursor, and trace which statement last defined a value
+(def-use). Read-only, all derived from the saved trace — no re-run.
+
+```bash
+# Print the whole navigable timeline:
+python -m focustracer replay output/sample_trace.xml --list
+
+# Start at the crash, look at the state there:
+python -m focustracer replay output/sample_trace.xml --at-exception
+
+# Start at timeline index 0 and step 3 events forward (window shows neighbours):
+python -m focustracer replay output/sample_trace.xml --seq 0 --step 3 --window 2
+
+# Step backward 2 from a line, and ask where `total` was last defined:
+python -m focustracer replay output/sample_trace.xml --at-line 42 --step -2 --def total
+
+# Dump the cursor view (state + neighbours) to JSON:
+python -m focustracer replay output/sample_trace.xml --at-exception --json cursor.json
+```
+
+`--step` is signed (`+N` forward, `-N` backward) and applied from the start
+point (`--at-exception` / `--at-event` / `--at-line` / `--seq`, default: index 0).
+Realises FR-KIO2-02 (forward/backward navigation with state inspection).
+
+> **GUI parity:** `slice`, `explain`, `reverse`, and `replay` are all available
+> from the web UI too — open any trace under **Trace Logs** and use the
+> **Slice / Reverse / Replay / Explain** tabs. You can also pull Ollama models
+> from **Settings › AI Agent › Models** with live progress. Launch with
+> `focustracer gui`.
+
 ## Using Local Ollama Reliably
 
 Recommended bridge flow for CLI-only environments:
@@ -240,7 +298,9 @@ with TraceContext(
 - `agent/opencode_client.py`: OpenCode CLI health and target suggestion
 - `core/slicer.py`: backward dynamic slicing (data + control dependency) over a trace
 - `core/explain.py`: builds the value-annotated slice context and drives LLM root-cause explanation
-- `cli.py`: `check-agent`, `suggest-targets`, `run`, `load`, `slice`, `explain`
+- `core/reverse.py`: reverse execution — reconstructs observable state and rewinds through a trace
+- `core/replay.py`: interactive replay — a movable cursor (forward/backward/jump/def-use) over the timeline
+- `cli.py`: `check-agent`, `suggest-targets`, `run`, `load`, `slice`, `explain`, `reverse`, `replay`
 
 ## CLI Reference (Detaylı)
 

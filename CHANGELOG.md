@@ -1,5 +1,73 @@
 # Changelog
 
+## [1.6.0] — 2026-07-30 — `replay` komutu: ileri+geri interaktif stepping + GUI paritesi
+
+Final KIO2 kapsamına (D2.6) hizalama. D2.6'da FR-KIO2-02 artık "forward/backward
+navigation and the inspection of state snapshots" olarak tanımlı. `reverse`
+tek-atış rewind idi; `replay` tüm timeline üzerinde gezinen bir **imleç**:
+ileri/geri adımla, herhangi bir noktaya atla, imleçteki tam gözlemlenebilir
+state'i oku, bir değeri en son hangi statement'ın tanımladığını (def-use) izle.
+Salt-okunur — her şey kaydedilmiş trace'ten türetilir, yeniden çalıştırma yok.
+
+### Added
+- **`focustracer replay <trace.xml>`** CLI komutu:
+  - Başlangıç noktası: `--at-exception` / `--at-event ID` / `--at-line LINE [--function]` / `--seq N` (varsayılan: index 0).
+  - `--step N`: işaretli offset (`+N` ileri, `-N` geri).
+  - `--window K`: imleç etrafında gösterilecek komşu satır-event sayısı.
+  - `--def VAR`: VAR'ı imleçte en son tanımlayan statement'ı göster (def-use).
+  - `--list`: tüm gezilebilir timeline'ı yazdır.
+  - `--json PATH`: imleç görünümünü (state + komşular) JSON'a yaz.
+- **`core/replay.py`** — `ReplaySession`: `step_forward`/`step_back`/`jump_to_*`/
+  `state`/`def_of`/`to_dict`. `reverse.Reconstructor`'ın moment listesini yeniden kullanır.
+- **GUI paritesi:** `slice`, `explain`, `reverse`, `replay` artık web UI'dan da
+  çalışıyor. Yeni backend endpoint'leri: `POST /api/trace/{slice,reverse,replay,explain}`.
+  Trace Logs'ta bir çıktı açılınca **Slice / Reverse / Replay / Explain** sekmeleri.
+  Replay endpoint'i stateless: istemci `seq`'i tutup `seq±1` ile tekrar POST eder.
+- **Model yönetimi (GUI'de `install` paritesi):** Settings › AI Agent altında
+  **Models** bölümü — kurulu Ollama modellerini listeler, tek tıkla model çeker
+  (canlı ilerleme %). `OllamaClient.pull_model` (streaming) + endpoint'ler:
+  `GET /api/ollama/models`, `POST /api/ollama/pull` (SSE ile ilerleme).
+- **Explain UX düzeltmesi:** exception'sız trace'lerde Explain/Slice artık kriter
+  (`LINE[:var]`) alabiliyor; exception yokken anlaşılır yönlendirici hata mesajı.
+- `tests/test_replay.py`: ileri/geri simetrisi, sınır clamp'i, exception'a atlama,
+  event/line jump, def-use, `to_dict` şekli, boş trace reddi (9 test).
+
+### Notes
+- `explain` (LLM root-cause) FocusTracer'da bağımsız araç olarak kalır; final KIO2
+  entegrasyonunda LLM akıl yürütme KIO7'ye devredilir (KIO2 lokalizasyonda durur).
+
+## [1.5.0] — 2026-07-24 — `reverse` komutu: reverse execution / state rewind
+
+KIO2 dynamic slicing fazı 4 (Stage 3 — Reverse Execution). GA'nın KIO2 adının
+diğer yarısı: *"Reverse Execution"*, "rewind/replay", "enhanced state recovery".
+
+### Added
+- **`focustracer reverse <trace.xml>`** CLI komutu:
+  - `--at-exception` (varsayılan) / `--at-event ID` / `--at-line LINE [--function NAME]`:
+    hedef nokta.
+  - `--step-back K`: hedeften K satır-event geriye sar (varsayılan 5).
+  - `--json PATH`: yeniden kurulan state'(ler)i yan dosyaya yaz.
+  - Çıktı: hedefteki state tablosu + **geriye doğru zaman çizelgesi**. Her adımda
+    hangi değişkenin geri alındığını gösterir (`undo total: 12 → 6`), çağrı
+    sınırlarını da aşarak sarar.
+- **`core/reverse.py`** — state reconstructor:
+  - Trace'i frame-farkındalıklı yürütür; her satırda frame'in gözlemlenebilir
+    state'ini kurar. Detailed modda satırın tam `<locals>` snapshot'ını kullanır
+    (kesin; delta offset'i ve loop-header boşluklarını atlar), normal modda
+    tersinir `<delta>` biriktirmeye düşer.
+  - `reverse_trace`, `Reconstructor`, `state_diff`, `result_to_dict`.
+- `tests/test_reverse.py`: exception state recovery, iterasyonlar arası state
+  rewind (total 0→2→6), `--at-line`/`--at-event` hedefleri, undo diff, JSON,
+  exception yoksa hata.
+
+### Design
+- **Şema değişmez, trace'e yazılmaz.** Reconstructed state türetilmiş veridir
+  (delta'lar zaten kodluyor); geri yazmak redundant olur ve trace'i şişirir.
+  `reverse`, `load` gibi salt-okunur bir sorgu/görüntüleme komutudur; trace
+  değişmez kayıt olarak kalır. İstenirse `--json` yan dosyası.
+- **Sınır:** değerler string-repr; canlı nesneler değil, gözlemlenebilir state
+  geri kurulur — debugging/state-recovery için doğru, deliverable'da böyle konumlanır.
+
 ## [1.4.0] — 2026-07-24 — `run`: fonksiyon vermeden otomatik trace-all
 
 ### Changed

@@ -316,6 +316,82 @@ def create_parser() -> argparse.ArgumentParser:
         "--output", default=None, help="Write the explanation to this file",
     )
 
+    # ---------------------------------------------------------------- reverse
+    reverse_parser = subparsers.add_parser(
+        "reverse",
+        help="Reverse execution: reconstruct state and step backward through a trace",
+    )
+    reverse_parser.add_argument("trace_file", help="Path to the trace XML file")
+    reverse_parser.add_argument(
+        "--at-exception", action="store_true",
+        help="Reconstruct state at the crash (default if no --at-event/--at-line)",
+    )
+    reverse_parser.add_argument(
+        "--at-event", type=int, default=None, metavar="ID",
+        help="Reconstruct state at line event ID",
+    )
+    reverse_parser.add_argument(
+        "--at-line", type=int, default=None, metavar="LINE",
+        help="Reconstruct state at a source line",
+    )
+    reverse_parser.add_argument(
+        "--function", default=None, help="Disambiguate --at-line by function",
+    )
+    reverse_parser.add_argument(
+        "--step-back", type=int, default=5, metavar="K",
+        help="How many line-events to rewind from the target (default 5)",
+    )
+    reverse_parser.add_argument(
+        "--json", default=None, metavar="PATH",
+        help="Write the reconstructed state(s) to a JSON sidecar",
+    )
+
+    # ---------------------------------------------------------------- replay
+    replay_parser = subparsers.add_parser(
+        "replay",
+        help="Interactive replay: step forward AND backward through a trace, inspect state at any point",
+    )
+    replay_parser.add_argument("trace_file", help="Path to the trace XML file")
+    replay_parser.add_argument(
+        "--at-exception", action="store_true",
+        help="Start the cursor at the crash",
+    )
+    replay_parser.add_argument(
+        "--at-event", type=int, default=None, metavar="ID",
+        help="Start the cursor at line event ID",
+    )
+    replay_parser.add_argument(
+        "--at-line", type=int, default=None, metavar="LINE",
+        help="Start the cursor at a source line",
+    )
+    replay_parser.add_argument(
+        "--seq", type=int, default=None, metavar="N",
+        help="Start the cursor at timeline index N (0 = first line event)",
+    )
+    replay_parser.add_argument(
+        "--function", default=None, help="Disambiguate --at-line by function",
+    )
+    replay_parser.add_argument(
+        "--step", type=int, default=0, metavar="N",
+        help="Move N steps from the start point: +N forward, -N backward",
+    )
+    replay_parser.add_argument(
+        "--window", type=int, default=3, metavar="K",
+        help="How many neighbour line-events to show around the cursor (default 3)",
+    )
+    replay_parser.add_argument(
+        "--def", dest="def_var", default=None, metavar="VAR",
+        help="Show which statement last defined VAR at the cursor (def-use)",
+    )
+    replay_parser.add_argument(
+        "--list", action="store_true",
+        help="Print the whole navigable timeline instead of a single cursor view",
+    )
+    replay_parser.add_argument(
+        "--json", default=None, metavar="PATH",
+        help="Write the cursor view (state + neighbours) to a JSON sidecar",
+    )
+
     return parser
 
 
@@ -1226,6 +1302,153 @@ def explain_cmd(args: argparse.Namespace) -> int:
     return 0
 
 
+def _fmt_state(state: dict, limit: int = 12) -> str:
+    items = [f"{n}={v[0]}" for n, v in list(state.items())[:limit]]
+    if len(state) > limit:
+        items.append(f"… (+{len(state) - limit})")
+    return ", ".join(items) if items else "(empty)"
+
+
+def reverse_cmd(args: argparse.Namespace) -> int:
+    """Reconstruct observable state at a point and rewind step-by-step."""
+    from focustracer.core.reverse import reverse_trace, result_to_dict, state_diff
+
+    try:
+        result = reverse_trace(
+            args.trace_file,
+            at_exception=args.at_exception,
+            at_event=args.at_event,
+            at_line=args.at_line,
+            function=args.function,
+            step_back=max(0, args.step_back),
+        )
+    except FileNotFoundError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"[!] Reverse failed: {exc}", file=sys.stderr)
+        return 1
+
+    t = result.target
+    print(f"[*] Reverse state @ {result.label}  —  {t.function} L{t.line}: {t.source}")
+    print("-" * 60)
+    for name, (value, vtype) in t.state.items():
+        print(f"    {name} = {value}    ({vtype})")
+    print("-" * 60)
+
+    if result.timeline:
+        print(f"◀ Reverse timeline — {len(result.timeline)} step(s) back:")
+        ordered = result.timeline + [t]
+        # walk backward from the moment just before the target
+        for i in range(len(ordered) - 2, -1, -1):
+            m = ordered[i]
+            step = i - (len(ordered) - 1)
+            print(f"  {step:>3}  {m.function} L{m.line}: {m.source}")
+            later = ordered[i + 1]
+            if later.frame_id == m.frame_id:
+                diffs = state_diff(m, later)
+                for name, ev, lv in diffs:
+                    print(f"         undo  {name}: {lv} → {ev}")
+            else:
+                print(f"         ↑ returned from {later.function} to {m.function}")
+                print(f"         state: {_fmt_state(m.state)}")
+        print("-" * 60)
+
+    if args.json:
+        Path(args.json).write_text(
+            json.dumps(result_to_dict(result), indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        print(f"[*] Reconstructed state written to {args.json}", file=sys.stderr)
+    return 0
+
+
+def replay_cmd(args: argparse.Namespace) -> int:
+    """Navigate a trace with a movable cursor: forward, backward, jump, inspect."""
+    from focustracer.core.replay import ReplaySession
+
+    try:
+        session = ReplaySession.from_trace(args.trace_file)
+    except FileNotFoundError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"[!] Replay failed: {exc}", file=sys.stderr)
+        return 1
+
+    # -- position the cursor at the requested start point ------------------
+    try:
+        if args.seq is not None:
+            session.jump_to_seq(args.seq)
+        elif args.at_event is not None:
+            session.jump_to_event(args.at_event)
+        elif args.at_line is not None:
+            session.jump_to_line(args.at_line, args.function)
+        elif args.at_exception:
+            session.jump_to_exception()
+        # else: default cursor stays at seq 0 (start of execution)
+    except ValueError as exc:
+        print(f"[!] Replay failed: {exc}", file=sys.stderr)
+        return 1
+
+    if args.step > 0:
+        session.step_forward(args.step)
+    elif args.step < 0:
+        session.step_back(-args.step)
+
+    if args.list:
+        print(f"[*] Timeline — {session.total} line-event(s), cursor at #{session.cursor}")
+        print("-" * 60)
+        for m in session.moments:
+            mark = "▶" if m.seq == session.cursor else " "
+            print(f"  {mark} #{m.seq:<4} {m.function} L{m.line}: {m.source}")
+        print("-" * 60)
+        return 0
+
+    cur = session.current
+    arrows = []
+    if session.can_back:
+        arrows.append("◀ back")
+    if session.can_forward:
+        arrows.append("forward ▶")
+    print(f"[*] Replay cursor #{session.cursor}/{session.total - 1}  "
+          f"({' · '.join(arrows) or 'single moment'})")
+    print(f"    @ {cur.function} L{cur.line}: {cur.source}")
+    print("-" * 60)
+    for name, (value, vtype) in cur.state.items():
+        print(f"    {name} = {value}    ({vtype})")
+    print("-" * 60)
+
+    if args.window > 0:
+        view = session.to_dict(window=args.window)
+        print("Timeline around cursor:")
+        for entry in view["timeline"]:
+            mark = "▶" if entry["is_cursor"] else " "
+            print(f"  {mark} #{entry['seq']:<4} {entry['function']} L{entry['line']}: {entry['source']}")
+            for u in entry.get("change", []):
+                print(f"        Δ {u['name']}: {u['from']} → {u['to']}")
+        print("-" * 60)
+
+    if args.def_var:
+        site = session.def_of(args.def_var)
+        if site is None:
+            print(f"[!] '{args.def_var}' is not defined at the cursor.")
+        else:
+            m = site.moment
+            origin = "(call boundary)" if site.old_value is None else f"{site.old_value} → {site.new_value}"
+            print(f"[*] '{args.def_var}' last defined at #{m.seq}  {m.function} L{m.line}: {m.source}")
+            print(f"    {origin}")
+        print("-" * 60)
+
+    if args.json:
+        Path(args.json).write_text(
+            json.dumps(session.to_dict(window=args.window), indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        print(f"[*] Cursor view written to {args.json}", file=sys.stderr)
+    return 0
+
+
 def launch_gui(args: argparse.Namespace) -> int:
     """Start the FocusTracer web UI (FastAPI + Uvicorn)."""
     import webbrowser
@@ -1278,6 +1501,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         return slice_trace_cmd(args)
     if args.command == "explain":
         return explain_cmd(args)
+    if args.command == "reverse":
+        return reverse_cmd(args)
+    if args.command == "replay":
+        return replay_cmd(args)
     parser.print_help()
     return 1
 

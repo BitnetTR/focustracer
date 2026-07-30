@@ -106,6 +106,31 @@ class OllamaClient(BaseAIAgent):
         except requests.RequestException:
             return []
 
+    def pull_model(self, name: str) -> Generator[dict[str, Any], None, None]:
+        """Pull a model via ``POST /api/pull``, yielding streamed progress dicts.
+
+        Each yielded dict is an Ollama progress line, e.g.
+        ``{"status": "downloading", "completed": 12345, "total": 67890}`` or
+        ``{"status": "success"}``. Errors surface as ``{"error": "..."}``.
+        """
+        try:
+            with self._session.post(
+                f"{self.base_url}/api/pull",
+                json={"name": name, "stream": True},
+                stream=True,
+                timeout=(10, None),  # connect timeout; no read timeout (long download)
+            ) as response:
+                response.raise_for_status()
+                for line in response.iter_lines():
+                    if not line:
+                        continue
+                    try:
+                        yield json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+        except requests.RequestException as exc:
+            yield {"error": str(exc)}
+
     def health(self) -> dict[str, Any]:
         try:
             models = self._fetch_tags().get("models", [])
