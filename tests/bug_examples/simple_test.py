@@ -4,7 +4,7 @@ Basit Test Programı
 Bu dosya trace_recorder'ın temel işlevlerini test eder.
 """
 
-from TraceRecorder import TraceContext
+from focustracer import TraceContext
 
 
 def sum_of_even(mylist):

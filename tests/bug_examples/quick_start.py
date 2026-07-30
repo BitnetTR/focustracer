@@ -7,7 +7,7 @@ Bu dosya trace_recorder kullanımının en basit örneğini gösterir.
     python quick_start.py
 """
 
-from TraceRecorder import TraceContext
+from focustracer import TraceContext
 
 
 def greet(name):

@@ -100,6 +100,18 @@ class TraceDocument:
                 etype = node["data"].get("event_type", "")
                 counts[etype] = counts.get(etype, 0) + 1
             elif t in ("thread", "scope"):
+                # In v2.x each <scope> encodes one function call (there is no
+                # explicit <event type="call">); count it — and its normal-return
+                # or exception outcome — so totals stay consistent with the flat
+                # v1 format. A normal return is a direct <return_value> child; the
+                # exception path instead carries a child <event type="return">
+                # (counted via the event branch), so the two never double-count.
+                if t == "scope":
+                    counts["call"] = counts.get("call", 0) + 1
+                    if node.get("return_value") is not None:
+                        counts["return"] = counts.get("return", 0) + 1
+                    if node.get("exception") is not None:
+                        counts["exception"] = counts.get("exception", 0) + 1
                 cls._walk_events(node.get("children", []), counts)
             elif t == "loop":
                 for iter_obj in node.get("iteration_list", []):
@@ -302,6 +314,7 @@ class TraceLoader:
             "file": "",
             "thread_id": "",
             "delta": [],
+            "reads": {},
             "arguments": {},
             "locals": {},
             "return_value": None,
@@ -322,6 +335,12 @@ class TraceLoader:
                 data["thread_id"] = text
             elif tag == "delta":
                 data["delta"] = self._parse_delta(child)
+            elif tag == "reads":
+                data["reads"] = {
+                    r.get("name", ""): ((r.text or "").strip(), r.get("type", ""))
+                    for r in child
+                    if r.tag == "read"
+                }
             elif tag == "arguments":
                 data["arguments"] = self._parse_arguments(child)
             elif tag == "locals":

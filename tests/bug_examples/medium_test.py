@@ -8,7 +8,7 @@ Daha karmaşık senaryoları test eder:
 - Class kullanımı
 """
 
-from TraceRecorder import TraceContext
+from focustracer import TraceContext
 
 
 class Calculator:

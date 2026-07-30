@@ -119,16 +119,12 @@ class OpenCodeClient(BaseAIAgent):
 
     def analyze_trace(
         self,
-        trace_file: str,
-        source_file: str,
+        slice_context: str,
         *,
         error_context: str | None = None,
     ) -> str:
-        prompt = (
-            "Analyze the Python trace and source file and explain likely root cause.\n"
-            "Provide next tracing focus recommendations.\n\n"
-            f"Source file: {source_file}\n"
-            f"Trace file: {trace_file}\n"
-            f"Error context: {error_context or ''}\n"
-        )
+        from focustracer.core.explain import EXPLAIN_SYSTEM_PROMPT
+
+        extra = f"Additional user context: {error_context}\n\n" if error_context else ""
+        prompt = f"{EXPLAIN_SYSTEM_PROMPT}\n\n{extra}{slice_context}"
         return self.generate(prompt, timeout=180)

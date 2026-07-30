@@ -2,7 +2,11 @@ myenv/
 __pycache__
 .claude/
 output/
-tests
+# Generated trace artifacts (do not ignore the whole tests/ tree — that hides real test files)
+*_trace.xml
+*.targets.json
+# Auto-generated synthetic test fixtures
+tests/**/synthetic_*
 .understand-anything/
 build/
 # Added by code-review-graph

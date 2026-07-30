@@ -38,11 +38,15 @@ class BaseAIAgent(ABC):
     @abstractmethod
     def analyze_trace(
         self,
-        trace_file: str,
-        source_file: str,
+        slice_context: str,
         *,
         error_context: str | None = None,
     ) -> str:
+        """Explain a backward dynamic slice (see core.explain.build_slice_context).
+
+        ``slice_context`` is the compact, value-annotated slice text — not a raw
+        trace. Returns the model's root-cause explanation.
+        """
         raise NotImplementedError
 
     def is_available(self) -> bool:

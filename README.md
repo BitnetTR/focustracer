@@ -103,6 +103,16 @@ python -m focustracer suggest-targets \
 
 Runs the target script, writes an XML trace, writes the merged target manifest next to it, and validates the XML.
 
+**No `--function`? It traces everything in the script.** If you give no function
+targets (and don't use `--auto-targets`), FocusTracer traces every function
+defined in the target script — no need to name them:
+
+```bash
+python -m focustracer run --target-script app.py           # trace all functions in app.py
+```
+
+Name functions to focus the trace (smaller output on large programs):
+
 ```bash
 python -m focustracer run \
   --target-script tests/fixtures/cli_sample_app.py \
@@ -123,6 +133,47 @@ python -m focustracer run \
   --auto-targets \
   --hint "Trace the worker path and multiplication logic"
 ```
+
+### `slice`
+
+Computes a **backward dynamic slice** over a saved trace: the statements that
+actually influenced a value on this run (data + control dependencies). Needs a
+`detailed`, schema ≥ 2.3 trace (the default for `run`). Writes the slice into a
+`<slice>` element in `<trace>.sliced.xml` and re-validates against the v2.3 XSD.
+
+```bash
+# Slice from the innermost exception's failing line (root-cause):
+python -m focustracer slice output/sample_trace.xml --at-exception
+
+# Slice a specific value: which statements produced `total` at line 42?
+python -m focustracer slice output/sample_trace.xml --at app.py:42:total
+
+# Data dependencies only (skip control):
+python -m focustracer slice output/sample_trace.xml --at-exception --no-control
+```
+
+Output markers: `◆` criterion, `▸` control dependency, `·` data dependency.
+
+### `explain`
+
+Computes a slice and asks an LLM for a **root-cause explanation**. The model is
+given the *slice* — the causal chain annotated with runtime values — not the raw
+trace, so even a small local model (e.g. `qwen2.5:3b`) can pinpoint the cause.
+
+```bash
+# Explain the root cause of an exception:
+python -m focustracer explain output/sample_trace.xml \
+  --at-exception --model qwen2.5:3b --ollama-url http://localhost:11434
+
+# See exactly what the model receives (works offline):
+python -m focustracer explain output/sample_trace.xml --at-exception --show-context
+
+# Explain a specific value, and save the explanation:
+python -m focustracer explain output/sample_trace.xml --at app.py:42:total --output rootcause.md
+```
+
+The model answers with: (1) root cause, (2) the causal chain in plain language,
+(3) a concrete fix. `--show-context` prints the slice context and needs no agent.
 
 ## Using Local Ollama Reliably
 
@@ -187,7 +238,9 @@ with TraceContext(
 - `core/targeting.py`: target manifest and code inventory helpers
 - `agent/ollama_client.py`: Ollama health, model listing, target suggestion
 - `agent/opencode_client.py`: OpenCode CLI health and target suggestion
-- `cli.py`: `check-agent`, `suggest-targets`, `run`
+- `core/slicer.py`: backward dynamic slicing (data + control dependency) over a trace
+- `core/explain.py`: builds the value-annotated slice context and drives LLM root-cause explanation
+- `cli.py`: `check-agent`, `suggest-targets`, `run`, `load`, `slice`, `explain`
 
 ## CLI Reference (Detaylı)
 

@@ -295,10 +295,9 @@ def get_inventory(root: str = Query(...), script: str = Query(...)) -> dict[str,
 
 @app.get("/api/outputs")
 def list_outputs(project_root: str | None = None) -> dict[str, Any]:
-    """List trace XML files from src/output/ (FocusTracer global output directory)."""
-    # Always look in FocusTracer/src/output
-    base = Path(__file__).resolve().parent.parent.parent / "output"
-    candidates = [base]
+    """List trace XML files from the project's output directory (``<project_root>/output``,
+    or ``<cwd>/output`` when no project root is given)."""
+    candidates = [_output_base(project_root)]
 
     seen: set[str] = set()
     files = []
@@ -357,7 +356,7 @@ class RunTraceRequest(BaseModel):
     detail: str = "detailed"
     max_depth: int = 100
     max_iterations: int | None = None
-    schema_version: str = "2.1"
+    schema_version: str = "2.3"
     output_dir: str = "output"
 
 
@@ -370,11 +369,18 @@ class SuggestRequest(BaseModel):
     detail: str = "detailed"
     max_depth: int = 100
     max_iterations: int | None = None
-    schema_version: str = "2.1"
+    schema_version: str = "2.3"
     output_dir: str = "output"
     # manual additions merged with AI suggestions
     functions: list[str] = []
     files: list[str] = []
+
+
+def _output_base(project_root: str | None, output_dir: str = "output") -> Path:
+    """Where trace files are written/listed: ``<project_root>/<output_dir>`` when a
+    project root is given, otherwise ``<cwd>/<output_dir>``. Never the install dir."""
+    base = Path(project_root) if project_root else Path.cwd()
+    return (base / output_dir).resolve()
 
 
 def _resolve_output_path(
@@ -382,9 +388,8 @@ def _resolve_output_path(
 ) -> tuple[Path, Path]:
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     script_stem = Path(target_script).stem
-    
-    # Store globally in FocusTracer/src/output
-    out_dir = Path(__file__).resolve().parent.parent.parent / "output"
+
+    out_dir = _output_base(project_root, output_dir or "output")
     out_dir.mkdir(parents=True, exist_ok=True)
     trace_path = out_dir / f"{timestamp}_{script_stem}.xml"
     manifest_path = trace_path.with_suffix(".targets.json")

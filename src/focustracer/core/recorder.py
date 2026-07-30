@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import html
 import json
 import linecache
@@ -57,7 +58,7 @@ class TraceRecorder:
         detail_level: str = "normal",
         output_format: str = "xml",
         enable_threading: bool = False,
-        schema_version: str = "2.2",
+        schema_version: str = "2.3",
         max_iterations: Optional[int] = None,
         target_functions: Optional[list[str]] = None,
         target_files: Optional[list[str]] = None,
@@ -179,6 +180,66 @@ class TraceRecorder:
             return linecache.getline(filename, lineno).strip()
         except Exception:
             return ""
+
+    @staticmethod
+    def _read_names_in_source(source_line: str) -> list[str]:
+        """Return the variable names *read* (used) on a single source line.
+
+        Parses the line with ``ast`` and collects every ``Name`` in ``Load``
+        context — this is the slicing *use* set. Augmented-assignment targets
+        (``total += x``) read their target too, so they are included. Names that
+        are only written (``x = ...``) are ``Store`` and excluded.
+
+        Control-flow headers (``if``/``for``/``while``/``elif``) do not parse as
+        a standalone statement; a ``pass`` body is appended so the predicate's
+        reads are still recovered. Returns first-seen order, de-duplicated.
+        """
+        candidates = [source_line]
+        stripped = source_line.strip()
+        if stripped.endswith(":"):
+            candidates.append(source_line + " pass")
+
+        tree = None
+        for candidate in candidates:
+            try:
+                tree = ast.parse(candidate, mode="exec")
+                break
+            except SyntaxError:
+                continue
+        if tree is None:
+            return []
+
+        reads: list[str] = []
+        seen: set[str] = set()
+        for node in ast.walk(tree):
+            name: str | None = None
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Load):
+                name = node.id
+            elif isinstance(node, ast.AugAssign) and isinstance(node.target, ast.Name):
+                # `x += ...` reads x before writing it.
+                name = node.target.id
+            if name and name not in seen:
+                seen.add(name)
+                reads.append(name)
+        return reads
+
+    def _extract_reads(
+        self, source_line: str, current_locals: dict[str, tuple[str, str]]
+    ) -> dict[str, tuple[str, str]]:
+        """Reads on this line, restricted to names present in local scope.
+
+        Values come from ``current_locals`` (captured *before* the line runs, so
+        they are exactly the values the line reads). Non-locals — globals,
+        builtins, called function names like ``divide`` — are skipped; local
+        data flow is what backward slicing follows.
+        """
+        if not source_line:
+            return {}
+        reads: dict[str, tuple[str, str]] = {}
+        for name in self._read_names_in_source(source_line):
+            if name in current_locals:
+                reads[name] = current_locals[name]
+        return reads
 
     @staticmethod
     def _qualified_name(frame) -> str:
@@ -395,6 +456,13 @@ class TraceRecorder:
                         event_data["caller"] = caller
                     if delta:
                         event_data["delta"] = delta
+                    # v2.3: capture the read (use) set for dynamic slicing.
+                    if self.detail_level == "detailed" and self.schema_version >= "2.3":
+                        reads = self._extract_reads(
+                            event_data.get("source", ""), current_locals
+                        )
+                        if reads:
+                            event_data["reads"] = reads
                     if self.detail_level == "detailed" and current_locals:
                         event_data["locals"] = current_locals
             elif event == "return":
@@ -507,12 +575,16 @@ class TraceRecorder:
 
     def _build_xml_tree(self) -> ET.Element:
         root = ET.Element("trace")
-        root.set("schema_version", self.schema_version)
+        # schema_version is a v2.x contract field; the v1 XSD forbids it on <trace>.
+        if self.schema_version.startswith("2."):
+            root.set("schema_version", self.schema_version)
 
         metadata_elem = ET.SubElement(root, "metadata")
         for key in ("python_version", "platform", "start_time", "end_time"):
             ET.SubElement(metadata_elem, key).text = str(self.metadata.get(key))
-        ET.SubElement(metadata_elem, "schema_version").text = self.schema_version
+        # v1 metadata has no <schema_version> child (the schema expects <statistics> next).
+        if self.schema_version.startswith("2."):
+            ET.SubElement(metadata_elem, "schema_version").text = self.schema_version
 
         stats_elem = ET.SubElement(metadata_elem, "statistics")
         ET.SubElement(stats_elem, "total_events").text = str(len(self.events))
@@ -784,6 +856,15 @@ class TraceRecorder:
                     ET.SubElement(change_elem, "old").text = change["old"]
                 if "new" in change:
                     ET.SubElement(change_elem, "new").text = change["new"]
+
+        # v2.3: reads (use set) — kept in delta→reads→arguments order per XSD.
+        if event.get("reads"):
+            reads_elem = ET.SubElement(element, "reads")
+            for name, (value, value_type) in event["reads"].items():
+                read_elem = ET.SubElement(reads_elem, "read")
+                read_elem.set("name", name)
+                read_elem.set("type", value_type)
+                read_elem.text = value
 
         if event.get("arguments"):
             args_elem = ET.SubElement(element, "arguments")

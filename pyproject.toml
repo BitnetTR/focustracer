@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "focustracer"
-version = "1.0.8"
+version = "1.4.0"
 description = "FocusTracer - LLM-guided dynamic trace log capture and debugging tool"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,7 +23,6 @@ dependencies = [
     "uvicorn[standard]>=0.29.0",
     "python-multipart>=0.0.9",
     "sse-starlette>=1.6.1",
-    "pymongo>=4.6.0",
     "python-dotenv>=1.0.0",
     "lxml>=5.0.0",
     "jinja2>=3.1.0",
@@ -37,6 +36,10 @@ dependencies = [
 
 [project.scripts]
 focustracer = "focustracer.cli:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

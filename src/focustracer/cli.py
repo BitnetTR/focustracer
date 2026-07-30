@@ -166,7 +166,7 @@ def create_parser() -> argparse.ArgumentParser:
         default="output",
         help="Trace output directory when --execute is used and --trace-output is not provided",
     )
-    suggest_parser.add_argument("--schema-version", default="2.2")
+    suggest_parser.add_argument("--schema-version", default="2.3")
     suggest_parser.add_argument(
         "--detail", choices=["minimal", "normal", "detailed"], default="detailed"
     )
@@ -198,7 +198,7 @@ def create_parser() -> argparse.ArgumentParser:
     )
     run_parser.add_argument("--output", help="Trace XML output path")
     run_parser.add_argument("--output-dir", default="output")
-    run_parser.add_argument("--schema-version", default="2.2")
+    run_parser.add_argument("--schema-version", default="2.3")
     run_parser.add_argument(
         "--detail", choices=["minimal", "normal", "detailed"], default="detailed"
     )
@@ -242,6 +242,78 @@ def create_parser() -> argparse.ArgumentParser:
         "--no-validate",
         action="store_true",
         help="Skip XSD validation before displaying",
+    )
+
+    # ------------------------------------------------------------------ slice
+    slice_parser = subparsers.add_parser(
+        "slice",
+        help="Compute a backward dynamic slice over a saved trace (v2.3)",
+    )
+    slice_parser.add_argument(
+        "trace_file",
+        help="Path to the trace XML file (must be detailed, schema >= 2.3)",
+    )
+    slice_parser.add_argument(
+        "--at-exception",
+        action="store_true",
+        help="Slice from the innermost exception's failing line (default if no --at)",
+    )
+    slice_parser.add_argument(
+        "--at",
+        default=None,
+        metavar="[FILE:]LINE[:VAR]",
+        help="Slice criterion, e.g. app.py:42:total or 42:total",
+    )
+    slice_parser.add_argument(
+        "--no-control",
+        action="store_true",
+        help="Data dependencies only (skip control dependencies)",
+    )
+    slice_parser.add_argument(
+        "--output",
+        default=None,
+        help="Sliced XML output path (default: <trace>.sliced.xml next to input)",
+    )
+    slice_parser.add_argument(
+        "--no-validate",
+        action="store_true",
+        help="Skip XSD validation of the sliced output",
+    )
+
+    # ---------------------------------------------------------------- explain
+    explain_parser = subparsers.add_parser(
+        "explain",
+        help="LLM root-cause explanation from a backward dynamic slice",
+    )
+    explain_parser.add_argument(
+        "trace_file",
+        help="Path to the trace XML file (detailed, schema >= 2.3)",
+    )
+    explain_parser.add_argument("--agent", choices=["ollama", "opencode"], default="ollama")
+    explain_parser.add_argument("--model", default=DEFAULT_MODEL)
+    explain_parser.add_argument("--ollama-url", default="http://localhost:11434")
+    explain_parser.add_argument("--opencode-cmd", default="opencode")
+    explain_parser.add_argument(
+        "--at-exception",
+        action="store_true",
+        help="Explain the innermost exception (default if no --at)",
+    )
+    explain_parser.add_argument(
+        "--at", default=None, metavar="[FILE:]LINE[:VAR]",
+        help="Slice criterion, e.g. app.py:42:total",
+    )
+    explain_parser.add_argument(
+        "--no-control", action="store_true", help="Data dependencies only",
+    )
+    explain_parser.add_argument(
+        "--error-context", default=None, help="Extra context passed to the model",
+    )
+    explain_parser.add_argument(
+        "--show-context", action="store_true",
+        help="Print the exact slice context sent to the model",
+    )
+    explain_parser.add_argument(
+        "--output", default=None, help="Write the explanation to this file",
     )
 
     return parser
@@ -979,6 +1051,23 @@ def run_trace(args: argparse.Namespace) -> int:
         )
 
     merged_manifest = manual_manifest.merge(ai_manifest)
+
+    # No function targets and no LLM selection → trace every function defined in
+    # the target script. Removes the "must name a function" friction; the recorder
+    # already supports untargeted tracing, this just scopes it to the user's script.
+    if not merged_manifest.functions and not args.auto_targets:
+        all_functions = list(inventory.functions)
+        if all_functions:
+            print(
+                f"[*] No function targets given — tracing all {len(all_functions)} "
+                f"function(s) defined in {Path(args.target_script).name}. "
+                f"Use --function to focus.",
+                file=sys.stderr,
+            )
+            merged_manifest = merged_manifest.merge(
+                TargetManifest(functions=all_functions)
+            )
+
     return _execute_trace_with_manifest(args, merged_manifest)
 
 
@@ -1016,6 +1105,124 @@ def load_trace(args: argparse.Namespace) -> int:
         filter_function=args.filter_function,
         filter_thread=args.filter_thread,
     )
+    return 0
+
+
+def _print_slice_failure(exc: Exception, args: argparse.Namespace) -> None:
+    """Print a slice/explain failure with an actionable hint."""
+    msg = str(exc)
+    print(f"[!] Slice failed: {msg}", file=sys.stderr)
+    if "no exception" in msg.lower() and not args.at:
+        print(
+            "    This trace has no exception, and --at-exception is the default.\n"
+            "    Slice a specific value instead:  --at LINE[:VAR]   (e.g. --at 42:total)",
+            file=sys.stderr,
+        )
+
+
+def slice_trace_cmd(args: argparse.Namespace) -> int:
+    """Compute a backward dynamic slice and embed it into a copy of the trace."""
+    from focustracer.core.slicer import slice_trace, annotate_trace_with_slice, slice_result_to_dicts
+
+    trace_file = args.trace_file
+    at_exception = args.at_exception or not args.at
+
+    try:
+        model, result = slice_trace(
+            trace_file,
+            at_exception=at_exception,
+            at=args.at,
+            include_control=not args.no_control,
+        )
+    except FileNotFoundError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        _print_slice_failure(exc, args)
+        return 1
+
+    if not any(step.event_id is not None and (step.uses or step.defs) for step in model.steps):
+        print(
+            "[!] This trace has no reads — slicing needs a detailed schema>=2.3 trace.\n"
+            "    Re-run: focustracer run --detail detailed --schema-version 2.3 ...",
+            file=sys.stderr,
+        )
+        return 1
+
+    out_path = annotate_trace_with_slice(trace_file, model, result, args.output)
+
+    if not args.no_validate:
+        from focustracer.validate.validator import validate_xml_against_xsd
+        is_valid, errors = validate_xml_against_xsd(out_path)
+        if not is_valid:
+            print(f"[!] Sliced XML failed XSD validation: {out_path}", file=sys.stderr)
+            for err in errors:
+                print(f"  - {err}", file=sys.stderr)
+            return 1
+
+    nodes = slice_result_to_dicts(model, result)
+    print(f"[*] Criterion: {result.criterion_label}")
+    print(f"[*] Slice: {len(nodes)} statement(s)"
+          f"  (control {'on' if result.include_control else 'off'})")
+    print("-" * 60)
+    for d in nodes:
+        marker = {"criterion": "◆", "control": "▸", "data": "·"}.get(d["dependency"], " ")
+        fn = d["function"] or "?"
+        print(f"  {marker} L{d['line']:<4} {fn:<14} {d['source']}")
+    print("-" * 60)
+    print(f"[*] Sliced trace written to {out_path}")
+    print("[*] XML validation: ok" if not args.no_validate else "")
+    return 0
+
+
+def explain_cmd(args: argparse.Namespace) -> int:
+    """Compute a slice, then ask the LLM for a root-cause explanation."""
+    from focustracer.core.slicer import slice_trace
+    from focustracer.core.explain import build_slice_context, explain_slice
+
+    at_exception = args.at_exception or not args.at
+    try:
+        model, result = slice_trace(
+            args.trace_file, at_exception=at_exception, at=args.at,
+            include_control=not args.no_control,
+        )
+    except FileNotFoundError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        _print_slice_failure(exc, args)
+        return 1
+
+    context = build_slice_context(model, result)
+    if args.show_context:
+        print("=== SLICE CONTEXT (sent to model) ===")
+        print(context)
+        print("=" * 40)
+
+    agent = _build_agent(args.agent, args.model, args.ollama_url, args.opencode_cmd)
+    health = agent.health()
+    if not health.get("ok"):
+        print(json.dumps(health, indent=2))
+        print("[!] AI agent is not reachable — cannot explain. "
+              "The slice above/`focustracer slice` still works offline.", file=sys.stderr)
+        return 1
+
+    try:
+        explanation, _ = explain_slice(
+            agent, model, result, error_context=args.error_context
+        )
+    except Exception as exc:  # noqa: BLE001 — surface any agent error to the user
+        print(f"[!] Explanation failed: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"[*] Criterion: {result.criterion_label}")
+    print("-" * 60)
+    print(explanation.strip())
+    print("-" * 60)
+
+    if args.output:
+        Path(args.output).write_text(explanation.strip() + "\n", encoding="utf-8")
+        print(f"[*] Explanation written to {args.output}", file=sys.stderr)
     return 0
 
 
@@ -1067,6 +1274,10 @@ def main(argv: Optional[list[str]] = None) -> int:
         return run_trace(args)
     if args.command == "load":
         return load_trace(args)
+    if args.command == "slice":
+        return slice_trace_cmd(args)
+    if args.command == "explain":
+        return explain_cmd(args)
     parser.print_help()
     return 1
 
