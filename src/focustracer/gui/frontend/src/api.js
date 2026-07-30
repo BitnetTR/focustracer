@@ -23,6 +23,8 @@ export const api = {
   agentsStatus: () => apiFetch('/agents/status'),
   systemInfo: () => apiFetch('/system/info'),
   ollamaMetrics: (model) => apiFetch(`/ollama/metrics${model ? `?model=${encodeURIComponent(model)}` : ''}`),
+  ollamaModels: () => apiFetch('/ollama/models'),
+  pullModel: (data) => apiFetch('/ollama/pull', { method: 'POST', body: JSON.stringify(data) }),
 
   listFiles: (root) => apiFetch(`/files?root=${encodeURIComponent(root)}`),
   fileContent: (path) => apiFetch(`/file-content?path=${encodeURIComponent(path)}`),
@@ -36,6 +38,12 @@ export const api = {
   runTrace: (data) => apiFetch('/trace/run', { method: 'POST', body: JSON.stringify(data) }),
   suggestTrace: (data) => apiFetch('/trace/suggest', { method: 'POST', body: JSON.stringify(data) }),
   getJob: (jobId) => apiFetch(`/job/${jobId}`),
+
+  // Trace analysis (parity with CLI: slice / reverse / replay / explain)
+  sliceTrace: (data) => apiFetch('/trace/slice', { method: 'POST', body: JSON.stringify(data) }),
+  reverseTrace: (data) => apiFetch('/trace/reverse', { method: 'POST', body: JSON.stringify(data) }),
+  replayTrace: (data) => apiFetch('/trace/replay', { method: 'POST', body: JSON.stringify(data) }),
+  explainTrace: (data) => apiFetch('/trace/explain', { method: 'POST', body: JSON.stringify(data) }),
 }
 
 /**
