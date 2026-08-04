@@ -35,6 +35,7 @@ class Moment:
     line: int
     source: str
     state: dict[str, tuple[str, str]]  # name -> (value, type)
+    depth: int = 0  # call-stack depth (0 = top level); enables step over/into/out
 
 
 @dataclass
@@ -119,6 +120,7 @@ class Reconstructor:
                         line=data.get("line", 0),
                         source=data.get("source", ""),
                         state=dict(state),
+                        depth=depth,
                     )
                 )
 

@@ -134,3 +134,61 @@ def test_to_dict_shape(tmp_path):
 def test_empty_trace_rejected(tmp_path):
     with pytest.raises(ValueError):
         ReplaySession([])
+
+
+# -- debugger stepping (step into / over / out) -----------------------------
+
+
+def _nested_session(tmp_path):
+    return _session(
+        tmp_path, exc_worker,
+        ["exc_divide", "exc_compute", "exc_worker"], catch=ZeroDivisionError,
+    )
+
+
+def test_depth_increases_with_nested_calls(tmp_path):
+    s = _nested_session(tmp_path)
+    assert max(m.depth for m in s.moments) >= 1  # calls recorded as deeper frames
+
+
+def test_step_into_advances_one_line(tmp_path):
+    s = _session(tmp_path, accumulate, ["accumulate"])
+    s.jump_to_seq(0)
+    s.step_into()
+    assert s.cursor == 1
+
+
+def test_step_over_skips_called_frame(tmp_path):
+    s = _nested_session(tmp_path)
+    # A useful call site: its next moment is deeper (a call), AND a later moment
+    # returns to depth <= the call site (so step-over has somewhere to land).
+    call = None
+    for m in s.moments[:-1]:
+        if s.moments[m.seq + 1].depth > m.depth and any(
+            later.depth <= m.depth for later in s.moments[m.seq + 1:]
+        ):
+            call = m.seq
+            break
+    assert call is not None, "expected a call site with a caller continuation"
+    d = s.moments[call].depth
+    s.jump_to_seq(call)
+    s.step_over()
+    assert s.cursor > call + 1        # skipped past the deeper called frame
+    assert s.current.depth <= d       # back in the caller frame (or shallower)
+
+
+def test_step_out_reaches_shallower_frame(tmp_path):
+    s = _nested_session(tmp_path)
+    deepest = max(s.moments, key=lambda m: m.depth)
+    if deepest.depth == 0:
+        pytest.skip("no nesting captured")
+    s.jump_to_seq(deepest.seq)
+    s.step_out()
+    assert s.current.depth < deepest.depth
+
+
+def test_step_dispatch_and_backward(tmp_path):
+    s = _session(tmp_path, accumulate, ["accumulate"])
+    s.jump_to_seq(s.total - 1)
+    s.step("over", back=True)
+    assert s.cursor < s.total - 1

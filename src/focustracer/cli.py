@@ -375,6 +375,14 @@ def create_parser() -> argparse.ArgumentParser:
         "--step", type=int, default=0, metavar="N",
         help="Move N steps from the start point: +N forward, -N backward",
     )
+    replay_step = replay_parser.add_mutually_exclusive_group()
+    replay_step.add_argument("--into", action="store_true", help="Debugger step into (one line, enters calls)")
+    replay_step.add_argument("--over", action="store_true", help="Debugger step over (skip called frames)")
+    replay_step.add_argument("--out", action="store_true", help="Debugger step out (leave current frame)")
+    replay_parser.add_argument(
+        "--back", action="store_true",
+        help="Apply --into/--over/--out backward (reverse execution)",
+    )
     replay_parser.add_argument(
         "--window", type=int, default=3, metavar="K",
         help="How many neighbour line-events to show around the cursor (default 3)",
@@ -390,6 +398,22 @@ def create_parser() -> argparse.ArgumentParser:
     replay_parser.add_argument(
         "--json", default=None, metavar="PATH",
         help="Write the cursor view (state + neighbours) to a JSON sidecar",
+    )
+
+    # ---------------------------------------------------------------- align
+    align_parser = subparsers.add_parser(
+        "align",
+        help="Align two traces of the same program and report their distance",
+    )
+    align_parser.add_argument("trace_a", help="First trace XML file")
+    align_parser.add_argument("trace_b", help="Second trace XML file")
+    align_parser.add_argument(
+        "--show-alignment", action="store_true",
+        help="Print the aligned statement pairs (matches and gaps)",
+    )
+    align_parser.add_argument(
+        "--json", default=None, metavar="PATH",
+        help="Write the alignment (distance + pairs) to a JSON sidecar",
     )
 
     return parser
@@ -1396,6 +1420,14 @@ def replay_cmd(args: argparse.Namespace) -> int:
     elif args.step < 0:
         session.step_back(-args.step)
 
+    # Debugger-style stepping (frame-depth aware), applied from the start point.
+    if args.into:
+        session.step_into(back=args.back)
+    elif args.over:
+        session.step_over(back=args.back)
+    elif args.out:
+        session.step_out(back=args.back)
+
     if args.list:
         print(f"[*] Timeline — {session.total} line-event(s), cursor at #{session.cursor}")
         print("-" * 60)
@@ -1447,6 +1479,52 @@ def replay_cmd(args: argparse.Namespace) -> int:
         )
         print(f"[*] Cursor view written to {args.json}", file=sys.stderr)
     return 0
+
+
+def align_cmd(args: argparse.Namespace) -> int:
+    """Align two traces of the same program and report their distance."""
+    from focustracer.core.align import align_traces
+
+    try:
+        al = align_traces(args.trace_a, args.trace_b)
+    except FileNotFoundError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"[!] Align failed: {exc}", file=sys.stderr)
+        return 1
+
+    print(f"[*] Trace A: {al.len_a} statements   Trace B: {al.len_b} statements")
+    print(f"[*] Distance: {al.distance}  (normalized {al.normalized_distance:.3f})")
+    print(f"[*] Matched: {al.matched}   Gaps (divergences): {al.gaps}")
+    if al.distance == 0:
+        print("[*] Traces are identical.")
+    print("-" * 60)
+
+    if args.show_alignment:
+        a_tok = _align_tokens(args.trace_a)
+        b_tok = _align_tokens(args.trace_b)
+        for ai, bj in al.pairs:
+            if ai is not None and bj is not None:
+                mark = "=" if a_tok[ai] == b_tok[bj] else "≠"
+                print(f"  {mark} {a_tok[ai]:<24} {b_tok[bj]}")
+            elif ai is not None:
+                print(f"  − {a_tok[ai]:<24} (only in A)")
+            else:
+                print(f"  + {'':<24} {b_tok[bj]}  (only in B)")
+        print("-" * 60)
+
+    if args.json:
+        Path(args.json).write_text(
+            json.dumps(al.to_dict(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
+        print(f"[*] Alignment written to {args.json}", file=sys.stderr)
+    return 0
+
+
+def _align_tokens(path: str) -> list[str]:
+    from focustracer.core.align import trace_tokens
+    return trace_tokens(path)
 
 
 def launch_gui(args: argparse.Namespace) -> int:
@@ -1505,6 +1583,8 @@ def main(argv: Optional[list[str]] = None) -> int:
         return reverse_cmd(args)
     if args.command == "replay":
         return replay_cmd(args)
+    if args.command == "align":
+        return align_cmd(args)
     parser.print_help()
     return 1
 

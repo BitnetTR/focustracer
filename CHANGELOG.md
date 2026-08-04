@@ -1,5 +1,42 @@
 # Changelog
 
+## [1.8.0] — 2026-08-01 — `align`: trace alignment & distance (FR-KIO2-03)
+
+Aynı programın farklı girdi/konfigürasyonlarla alınmış birden çok trace'ini
+karşılaştırma. Bioinformatik-esinli **global sequence alignment** (Needleman-Wunsch)
+ile trace'lerin çalıştırdığı statement dizilerini hizalar ve bir **mesafe** üretir.
+
+### Added
+- **`core/align.py`**: `align_traces(a, b)` → `Alignment` (distance, normalized,
+  matched, gaps, pairs); `trace_distance(a, b)`; `AlignedPair` (iki trace'i tek
+  oturumda gezme — A imleci → B'deki hizalı state).
+- **CLI `align <a.xml> <b.xml>`**: distance + eşleşme/gap özeti; `--show-alignment`
+  hizalanmış statement çiftlerini basar; `--json` sidecar.
+- Invariant: özdeş trace'lerin mesafesi **0**.
+- `tests/test_align.py`: özdeş→0, farklı→pozitif, simetri, AlignedPair (4 test).
+
+### Note
+- FR-KIO2-03'ün *Description*'ındaki ağır ML pipeline (dataset curation, model
+  training, MLOps, privacy) kapsam dışı/ileriye bırakıldı; somut Behaviour/Output/
+  Invariant (alignment + distance + çoklu-trace gezinme) implemente edildi.
+
+
+## [1.7.0] — 2026-08-01 — `replay`: debugger-grade step into / over / out (FR-KIO2-02)
+
+Final KIO2 FR-KIO2-02 ister: navigasyon "standart debugger gibi" davranmalı. `replay`
+satır-satır ileri/geri gidiyordu; artık **çağrı-derinliği farkında** stepping var.
+
+### Added
+- **`ReplaySession.step_into` / `step_over` / `step_out`** (+ `back=True` ile geriye):
+  - `step_into`: bir sonraki satır (çağrılan fonksiyonun içine girer).
+  - `step_over`: çağrılan frame'leri atlayıp aynı frame'in (ya da çağıranın) sonraki satırına.
+  - `step_out`: mevcut frame'den çıkıp çağırana döner.
+  - `ReplaySession.step(action, back)` dispatcher.
+- **`Moment.depth`** — her moment'in çağrı-yığını derinliği (stepping'in temeli); `moment_to_dict`'e `depth` eklendi.
+- **CLI `replay`**: `--into` / `--over` / `--out` + `--back` bayrakları.
+- `tests/test_replay.py`: derinlik artışı, step into/over/out, geriye step (5 yeni test).
+
+
 ## [1.6.0] — 2026-07-30 — `replay` komutu: ileri+geri interaktif stepping + GUI paritesi
 
 Final KIO2 kapsamına (D2.6) hizalama. D2.6'da FR-KIO2-02 artık "forward/backward

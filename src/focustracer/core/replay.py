@@ -34,6 +34,7 @@ def moment_to_dict(m: Moment) -> dict[str, Any]:
         "file": m.file,
         "line": m.line,
         "source": m.source,
+        "depth": m.depth,
         "state": {k: {"value": v[0], "type": v[1]} for k, v in m.state.items()},
     }
 
@@ -141,6 +142,40 @@ class ReplaySession:
             raise ValueError("no exception found in trace")
         self.cursor = m.seq
         return m
+
+    # -- debugger stepping (frame-depth aware) -----------------------------
+    # These mirror a standard debugger's Step Into / Over / Out, computed over
+    # the recorded timeline using each moment's call-stack ``depth``.
+
+    def _seek(self, forward: bool, pred) -> int:
+        rng = range(self.cursor + 1, self.total) if forward else range(self.cursor - 1, -1, -1)
+        for i in rng:
+            if pred(self.moments[i]):
+                return i
+        return self.cursor  # no match ⇒ stay put
+
+    def step_into(self, back: bool = False) -> Moment:
+        """One executed line in either direction — enters any called function."""
+        return self.step_back(1) if back else self.step_forward(1)
+
+    def step_over(self, back: bool = False) -> Moment:
+        """Next line in the current frame (or its caller), skipping called frames."""
+        d = self.current.depth
+        self.cursor = self._seek(forward=not back, pred=lambda m: m.depth <= d)
+        return self.current
+
+    def step_out(self, back: bool = False) -> Moment:
+        """Advance until execution leaves the current frame, landing in its caller."""
+        d = self.current.depth
+        self.cursor = self._seek(forward=not back, pred=lambda m: m.depth < d)
+        return self.current
+
+    def step(self, action: str = "into", back: bool = False) -> Moment:
+        """Dispatch a debugger step by name: 'into' | 'over' | 'out'."""
+        fn = {"into": self.step_into, "over": self.step_over, "out": self.step_out}.get(
+            action, self.step_into
+        )
+        return fn(back=back)
 
     # -- def-use -----------------------------------------------------------
 

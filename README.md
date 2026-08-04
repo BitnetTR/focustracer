@@ -221,11 +221,18 @@ python -m focustracer replay output/sample_trace.xml --at-line 42 --step -2 --de
 
 # Dump the cursor view (state + neighbours) to JSON:
 python -m focustracer replay output/sample_trace.xml --at-exception --json cursor.json
+
+# Debugger-grade stepping (frame-depth aware), from a start point:
+python -m focustracer replay output/sample_trace.xml --seq 1 --into   # enter a called function
+python -m focustracer replay output/sample_trace.xml --seq 1 --over   # skip over the called function
+python -m focustracer replay output/sample_trace.xml --at-exception --out --back  # step out, backward
 ```
 
 `--step` is signed (`+N` forward, `-N` backward) and applied from the start
 point (`--at-exception` / `--at-event` / `--at-line` / `--seq`, default: index 0).
-Realises FR-KIO2-02 (forward/backward navigation with state inspection).
+`--into` / `--over` / `--out` mirror a standard debugger's stepping (add `--back`
+for reverse). Realises FR-KIO2-02 (forward/backward navigation with state
+inspection and Step Into/Over/Out).
 
 > **GUI parity:** `slice`, `explain`, `reverse`, and `replay` are all available
 > from the web UI too — open any trace under **Trace Logs** and use the
@@ -299,8 +306,9 @@ with TraceContext(
 - `core/slicer.py`: backward dynamic slicing (data + control dependency) over a trace
 - `core/explain.py`: builds the value-annotated slice context and drives LLM root-cause explanation
 - `core/reverse.py`: reverse execution — reconstructs observable state and rewinds through a trace
-- `core/replay.py`: interactive replay — a movable cursor (forward/backward/jump/def-use) over the timeline
-- `cli.py`: `check-agent`, `suggest-targets`, `run`, `load`, `slice`, `explain`, `reverse`, `replay`
+- `core/replay.py`: interactive replay — a movable cursor (forward/backward/step into·over·out/jump/def-use) over the timeline
+- `core/align.py`: trace alignment — sequence-align two traces of the same program and measure their distance
+- `cli.py`: `check-agent`, `suggest-targets`, `run`, `load`, `slice`, `explain`, `reverse`, `replay`, `align`
 
 ## CLI Reference (Detaylı)
 
