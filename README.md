@@ -234,11 +234,48 @@ point (`--at-exception` / `--at-event` / `--at-line` / `--seq`, default: index 0
 for reverse). Realises FR-KIO2-02 (forward/backward navigation with state
 inspection and Step Into/Over/Out).
 
-> **GUI parity:** `slice`, `explain`, `reverse`, and `replay` are all available
-> from the web UI too — open any trace under **Trace Logs** and use the
-> **Slice / Reverse / Replay / Explain** tabs. You can also pull Ollama models
-> from **Settings › AI Agent › Models** with live progress. Launch with
-> `focustracer gui`.
+### `align`
+
+Compare traces of the **same program** run with different inputs or
+configurations. Three modes:
+
+```bash
+# 1) two traces: distance + how they line up
+python -m focustracer align output/run_a.xml output/run_b.xml
+python -m focustracer align output/run_a.xml output/run_b.xml --show-alignment
+python -m focustracer align output/run_a.xml output/run_b.xml --divergences --json align.json
+
+# 2) two traces, side by side: a cursor on A, the aligned point in B
+python -m focustracer align output/run_a.xml output/run_b.xml --seq 3
+python -m focustracer align output/run_a.xml output/run_b.xml --at-exception --window 4
+python -m focustracer align output/run_a.xml output/run_b.xml --seq 0 --into      # debugger step on A
+python -m focustracer align output/run_a.xml output/run_b.xml --at-line 42 --out --back
+
+# 3) three or more: curate them as a trace set
+python -m focustracer align output/run_*.xml --json set.json
+```
+
+Mode 2 accepts the same start-point and stepping flags as `replay`
+(`--seq` / `--at-event` / `--at-line` / `--at-exception`, `--step ±N`,
+`--into` / `--over` / `--out`, `--back`) and prints, at every position, the
+variables whose **recorded values differ** between the two runs. Mode 3 prints
+the pairwise distance matrix plus the **reference** (medoid — the most
+representative run) and the **outlier** (furthest from it; the natural first
+suspect when hunting a bug).
+
+The distance compares *control flow* (the executed `function:line` sequence), so
+two runs that take the same path with different data have distance **0** — their
+difference shows up in the value deltas of mode 2. Identical traces always have
+distance 0 (the FR-KIO2-03 invariant). Realises FR-KIO2-03.
+
+> **GUI parity:** `slice`, `explain`, `reverse`, `replay`, and `align` are all
+> available from the web UI too — open any trace under **Trace Logs** and use the
+> **Slice / Reverse / Replay / Align / Explain** tabs. The Replay and Align tabs
+> expose Step Into/Over/Out (with a forward/reverse toggle); Align lets you pick
+> other runs from the project's output folder and shows the side-by-side state,
+> value deltas, divergence regions, or — for three or more — the distance matrix.
+> You can also pull Ollama models from **Settings › AI Agent › Models** with live
+> progress. Launch with `focustracer gui`.
 
 ## Using Local Ollama Reliably
 
@@ -307,7 +344,9 @@ with TraceContext(
 - `core/explain.py`: builds the value-annotated slice context and drives LLM root-cause explanation
 - `core/reverse.py`: reverse execution — reconstructs observable state and rewinds through a trace
 - `core/replay.py`: interactive replay — a movable cursor (forward/backward/step into·over·out/jump/def-use) over the timeline
-- `core/align.py`: trace alignment — sequence-align two traces of the same program and measure their distance
+- `core/align.py`: trace alignment — sequence-align traces of the same program, measure their distance,
+  step through two traces side by side (`AlignedPair`), and curate N traces as a set (`TraceSet`:
+  distance matrix, reference/medoid, outlier)
 - `cli.py`: `check-agent`, `suggest-targets`, `run`, `load`, `slice`, `explain`, `reverse`, `replay`, `align`
 
 ## CLI Reference (Detaylı)

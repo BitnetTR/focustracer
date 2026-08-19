@@ -8,7 +8,8 @@ import {
   FileCode2, X, RefreshCw, CheckCircle2, XCircle, AlertCircle,
   Cpu, Terminal, Download, Eye, Clock, FileText, Loader2,
   Folder, LayoutGrid, Activity, GitBranch, Server, Gauge, Flame,
-  SkipBack, SkipForward, Sparkles, Scissors
+  SkipBack, SkipForward, Sparkles, Scissors,
+  GitCompare, CornerDownRight, CornerUpLeft, ArrowRight
 } from 'lucide-react'
 import { api, subscribeJobStream } from './api.js'
 import './App.css'
@@ -618,10 +619,30 @@ function ReverseTab({ path }) {
   )
 }
 
+/** Debugger step controls (into / over / out + direction), shared by Replay and Align. */
+function StepControls({ onStep, back, setBack }) {
+  return (
+    <>
+      <button
+        className="btn btn-ghost"
+        onClick={() => setBack(b => !b)}
+        title={back ? 'Steps run backward (reverse execution) — click for forward' : 'Steps run forward — click for reverse execution'}
+        style={back ? { color: 'var(--accent-cyan)' } : undefined}
+      >
+        {back ? '◀ rev' : 'fwd ▶'}
+      </button>
+      <button className="btn btn-ghost" onClick={() => onStep('into')} title="Step into (enters called functions)"><CornerDownRight size={13} /> into</button>
+      <button className="btn btn-ghost" onClick={() => onStep('over')} title="Step over (skips called frames)"><ArrowRight size={13} /> over</button>
+      <button className="btn btn-ghost" onClick={() => onStep('out')} title="Step out (leaves the current frame)"><CornerUpLeft size={13} /> out</button>
+    </>
+  )
+}
+
 function ReplayTab({ path }) {
   const [state, setState] = useState(null)
   const [err, setErr] = useState(null)
   const [defVar, setDefVar] = useState('')
+  const [back, setBack] = useState(false)
   const load = useCallback(async (body) => {
     setErr(null)
     try { setState(await api.replayTrace({ path, window: 4, ...body, def_var: defVar || null })) }
@@ -632,6 +653,7 @@ function ReplayTab({ path }) {
   if (err) return <div className="analyze-pane"><div className="analyze-err"><AlertCircle size={13} /> {err}</div></div>
   if (!state) return <div className="analyze-pane"><div className="spinner" /></div>
   const c = state.current
+  const doStep = (action) => load({ seq: state.cursor, step_action: action, back })
   return (
     <div className="analyze-pane">
       <div className="replay-nav">
@@ -641,6 +663,7 @@ function ReplayTab({ path }) {
         <button className="btn btn-ghost" onClick={() => go(state.cursor + 1)} disabled={!state.can_forward} title="Step forward"><ChevronRight size={14} /></button>
         <button className="btn btn-ghost" onClick={() => go(state.total - 1)} disabled={!state.can_forward} title="End"><SkipForward size={14} /></button>
         <button className="btn btn-ghost" onClick={() => load({ at_exception: true })} title="Jump to crash"><Flame size={13} /> crash</button>
+        <StepControls onStep={doStep} back={back} setBack={setBack} />
       </div>
       <div className="analyze-meta">{c.function} <b>L{c.line}</b>: <code>{c.source}</code></div>
       <StateTable state={c.state} />
@@ -694,15 +717,202 @@ function ExplainTab({ path }) {
   )
 }
 
+// ─── Align (FR-KIO2-03): compare this trace against other runs ───────────────
+
+/** One side of the side-by-side view: where the cursor is and what is in scope. */
+function AlignSide({ title, view, muted }) {
+  if (!view) {
+    return (
+      <div style={{ flex: 1, minWidth: 220, opacity: 0.6 }}>
+        <div className="analyze-sub">{title}</div>
+        <div className="analyze-meta">diverged — no aligned statement in this run</div>
+      </div>
+    )
+  }
+  const c = view.current
+  return (
+    <div style={{ flex: 1, minWidth: 220 }}>
+      <div className="analyze-sub">{title} <span className="badge badge-neutral">#{view.cursor} / {view.total - 1}</span></div>
+      <div className="analyze-meta" style={muted ? { color: 'var(--text-muted)' } : undefined}>
+        {c.function} <b>L{c.line}</b>: <code>{c.source}</code>
+      </div>
+      <StateTable state={c.state} />
+    </div>
+  )
+}
+
+function AlignMatrix({ res }) {
+  const n = res.paths.length
+  const name = (p) => p.split(/[\\/]/).pop()
+  return (
+    <>
+      <div className="analyze-sub">Pairwise distance (0 = identical runs)</div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ borderCollapse: 'collapse', fontSize: 12, fontFamily: 'var(--font-mono, monospace)' }}>
+          <thead>
+            <tr>
+              <th style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--text-muted)' }}>trace</th>
+              {res.paths.map((_, j) => <th key={j} style={{ padding: '4px 8px', color: 'var(--text-muted)' }}>#{j}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {res.matrix.map((row, i) => (
+              <tr key={i}>
+                <td style={{ padding: '4px 8px', whiteSpace: 'nowrap' }}>
+                  #{i} {name(res.paths[i])}
+                  {i === res.reference && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>reference</span>}
+                  {i === res.outlier && <span className="badge badge-neutral" style={{ marginLeft: 6 }}>outlier</span>}
+                </td>
+                {row.map((v, j) => (
+                  <td key={j} style={{ padding: '4px 8px', textAlign: 'right', opacity: v === 0 ? 0.45 : 1 }}>
+                    {v.toFixed(3)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="analyze-meta">
+        Reference (medoid) is the most representative run; the outlier is furthest from it —
+        the natural first suspect. Mean pairwise distance <b>{res.mean_distance.toFixed(3)}</b>.
+      </div>
+    </>
+  )
+}
+
+function AlignTab({ path, projectRoot }) {
+  const [outputs, setOutputs] = useState(null)
+  const [selected, setSelected] = useState([])
+  const [res, setRes] = useState(null)
+  const [err, setErr] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [back, setBack] = useState(false)
+
+  useEffect(() => {
+    api.listOutputs(projectRoot)
+      .then(d => setOutputs((d.outputs || []).filter(o => o.path !== path)))
+      .catch(() => setOutputs([]))
+  }, [projectRoot, path])
+
+  const toggle = (p) => {
+    setRes(null)
+    setSelected(s => s.includes(p) ? s.filter(x => x !== p) : [...s, p])
+  }
+
+  const run = async (body = {}) => {
+    if (!selected.length) return
+    setBusy(true); setErr(null)
+    try { setRes(await api.alignTraces({ paths: [path, ...selected], window: 3, ...body })) }
+    catch (e) { setErr(String(e.message || e)); setRes(null) }
+    finally { setBusy(false) }
+  }
+
+  const pair = res && res.mode === 'pair'
+  const go = (seq) => run({ seq })
+  const doStep = (action) => run({ seq: res.a_seq, step_action: action, back })
+
+  return (
+    <div className="analyze-pane">
+      <div style={{ color: 'var(--text-muted)', fontSize: 12 }}>
+        Compares this trace with other runs of the <b>same program</b> (global sequence
+        alignment). Pick <b>one</b> other run to step through both side by side, or
+        <b> two or more</b> to curate them as a trace set.
+      </div>
+
+      <div className="analyze-sub">Compare against</div>
+      {outputs === null && <div className="spinner" />}
+      {outputs !== null && outputs.length === 0 && (
+        <div className="analyze-meta">No other traces in this project's output folder yet — record another run first.</div>
+      )}
+      {outputs !== null && outputs.length > 0 && (
+        <div className="slice-list" style={{ maxHeight: 160 }}>
+          {outputs.map(o => (
+            <div key={o.path} className="slice-row" onClick={() => toggle(o.path)} style={{ cursor: 'pointer' }}>
+              <span className="slice-mark">{selected.includes(o.path) ? '◆' : '·'}</span>
+              <span className="slice-src">{o.filename}</span>
+              <span className="slice-line">{(o.size / 1024).toFixed(1)} KB</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button className="btn btn-primary" onClick={() => run({ seq: 0 })} disabled={busy || !selected.length}>
+        {busy ? <><div className="spinner" /> Aligning…</> : <><GitCompare size={13} /> Align {selected.length > 1 ? `${selected.length + 1} traces` : 'traces'}</>}
+      </button>
+
+      {err && <div className="analyze-err"><AlertCircle size={13} /> {err}</div>}
+
+      {res && res.mode === 'set' && <AlignMatrix res={res} />}
+
+      {pair && (
+        <>
+          <div className="analyze-meta">
+            Distance <b>{res.alignment.distance}</b> (normalized {res.alignment.normalized_distance.toFixed(3)}) ·
+            matched {res.alignment.matched} · gaps {res.alignment.gaps}
+            {res.alignment.distance === 0 && <> — <b>identical statement sequences</b></>}
+          </div>
+
+          <div className="replay-nav">
+            <button className="btn btn-ghost" onClick={() => go(0)} disabled={res.a_seq === 0} title="Start"><SkipBack size={14} /></button>
+            <button className="btn btn-ghost" onClick={() => go(res.a_seq - 1)} disabled={res.a_seq === 0} title="Back"><ChevronLeft size={14} /></button>
+            <span className="replay-pos">A #{res.a_seq} {res.aligned ? `≡ B #${res.b_seq}` : '≠ B'}</span>
+            <button className="btn btn-ghost" onClick={() => go(res.a_seq + 1)} disabled={!res.a.can_forward} title="Forward"><ChevronRight size={14} /></button>
+            <button className="btn btn-ghost" onClick={() => go(res.a.total - 1)} disabled={!res.a.can_forward} title="End"><SkipForward size={14} /></button>
+            <button className="btn btn-ghost" onClick={() => run({ at_exception: true })} title="Jump to crash in A"><Flame size={13} /> crash</button>
+            <StepControls onStep={doStep} back={back} setBack={setBack} />
+          </div>
+
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <AlignSide title="A — this trace" view={res.a} />
+            <AlignSide title="B — compared run" view={res.b} muted />
+          </div>
+
+          <div className="analyze-sub">Value deltas at the aligned point</div>
+          {!res.aligned && <div className="analyze-meta">The runs diverge here — there is no aligned statement to compare.</div>}
+          {res.aligned && res.delta.length === 0 && <div className="analyze-meta">Both runs recorded the same values here.</div>}
+          {res.aligned && res.delta.length > 0 && (
+            <div className="state-grid">
+              {res.delta.map(d => (
+                <div key={d.name} className="state-row">
+                  <span className="state-name">{d.name}</span>
+                  <span className="state-val">{String(d.a)}</span>
+                  <span className="state-val" style={{ color: 'var(--accent-cyan)' }}>{String(d.b)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {res.divergences.length > 0 && (
+            <>
+              <div className="analyze-sub">Divergence regions</div>
+              <div className="slice-list" style={{ maxHeight: 140 }}>
+                {res.divergences.map((d, i) => (
+                  <div key={i} className="slice-row" onClick={() => d.side === 'a' && go(d.start)} style={{ cursor: d.side === 'a' ? 'pointer' : 'default' }}>
+                    <span className="slice-mark">{d.side === 'a' ? '−' : '+'}</span>
+                    <span className="slice-line">#{d.start}..{d.end - 1}</span>
+                    <span className="slice-src">{d.length} statement(s) only in {d.side.toUpperCase()}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 const ANALYZE_TABS = [
   { id: 'xml', label: 'XML', icon: FileText },
   { id: 'slice', label: 'Slice', icon: Scissors },
   { id: 'reverse', label: 'Reverse', icon: RefreshCw },
   { id: 'replay', label: 'Replay', icon: Play },
+  { id: 'align', label: 'Align', icon: GitCompare },
   { id: 'explain', label: 'Explain', icon: Sparkles },
 ]
 
-function AnalyzeModal({ file, onClose }) {
+function AnalyzeModal({ file, projectRoot, onClose }) {
   const [tab, setTab] = useState('xml')
   return (
     <div className="xml-modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -736,6 +946,7 @@ function AnalyzeModal({ file, onClose }) {
           {tab === 'slice' && <SliceTab path={file.path} />}
           {tab === 'reverse' && <ReverseTab path={file.path} />}
           {tab === 'replay' && <ReplayTab path={file.path} />}
+          {tab === 'align' && <AlignTab path={file.path} projectRoot={projectRoot} />}
           {tab === 'explain' && <ExplainTab path={file.path} />}
         </div>
       </motion.div>
@@ -1041,7 +1252,7 @@ function BottomPanel({ logEntries, projectRoot, refreshTrigger }) {
       </div>
 
       <AnimatePresence>
-        {viewFile && <AnalyzeModal file={viewFile} onClose={() => setViewFile(null)} />}
+        {viewFile && <AnalyzeModal file={viewFile} projectRoot={projectRoot} onClose={() => setViewFile(null)} />}
       </AnimatePresence>
     </div>
   )
@@ -1133,7 +1344,7 @@ export default function App() {
         <div className="topbar-logo">
           <div className="topbar-logo-icon">🔍</div>
           <span className="topbar-logo-name">FocusTracer</span>
-          <span className="topbar-subtitle">v1.6</span>
+          <span className="topbar-subtitle">v1.9</span>
         </div>
         <div className="topbar-project">
           <Folder size={12} style={{ color: '#fbbf24', flexShrink: 0 }} />
