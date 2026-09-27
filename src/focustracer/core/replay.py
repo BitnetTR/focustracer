@@ -186,6 +186,11 @@ class ReplaySession:
         ``name`` was added or changed — the assignment that produced the value
         visible at the cursor. Returns ``None`` if the variable is not defined
         at the cursor or its origin predates the recorded frame.
+
+        A moment's state is recorded *before* its line runs, so a change first
+        visible at moment ``m`` was produced by the preceding moment of the
+        frame; that is the defining statement. A name already present at the
+        frame's first moment is a parameter and is attributed to that moment.
         """
         cur = self.current
         if name not in cur.state:
@@ -200,7 +205,7 @@ class ReplaySession:
             else:
                 for n, old_v, new_v in state_diff(prev, m):
                     if n == name:
-                        last_site = DefSite(name, m, old_v, new_v)
+                        last_site = DefSite(name, prev, old_v, new_v)
                         break
             prev = m
         return last_site

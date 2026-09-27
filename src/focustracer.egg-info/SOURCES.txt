@@ -15,6 +15,7 @@ src/focustracer/agent/base.py
 src/focustracer/agent/ollama_client.py
 src/focustracer/agent/opencode_client.py
 src/focustracer/core/__init__.py
+src/focustracer/core/align.py
 src/focustracer/core/display.py
 src/focustracer/core/explain.py
 src/focustracer/core/loader.py
@@ -31,11 +32,8 @@ src/focustracer/gui/settings.py
 src/focustracer/gui/frontend/dist/favicon.svg
 src/focustracer/gui/frontend/dist/icons.svg
 src/focustracer/gui/frontend/dist/index.html
-src/focustracer/gui/frontend/dist/testwrite
-src/focustracer/gui/frontend/dist/assets/index-BdYYZ8Xt.css
-src/focustracer/gui/frontend/dist/assets/index-CLnJtgrZ.js
-src/focustracer/gui/frontend/dist/assets/index-DyjGEtG-.js
-src/focustracer/gui/frontend/dist/assets/index-iBRINwpP.css
+src/focustracer/gui/frontend/dist/assets/index-XGwjnE8t.css
+src/focustracer/gui/frontend/dist/assets/index-b30_mpa9.js
 src/focustracer/schema/trace_schema.json
 src/focustracer/schema/trace_schema_v1.xsd
 src/focustracer/schema/trace_schema_v2.1.xsd
@@ -43,7 +41,9 @@ src/focustracer/schema/trace_schema_v2.2.xsd
 src/focustracer/schema/trace_schema_v2.3.xsd
 src/focustracer/schema/trace_schema_v2.xsd
 src/focustracer/validate/validator.py
+tests/test_align.py
 tests/test_explain.py
+tests/test_gui_align.py
 tests/test_hook_exceptions.py
 tests/test_hook_functions.py
 tests/test_hook_loops.py

@@ -120,6 +120,23 @@ def test_def_of_finds_defining_statement(tmp_path):
     assert site.new_value == s.state()["total"][0]
 
 
+def test_def_of_points_at_assigning_line_not_the_next(tmp_path):
+    """State is recorded before a line runs, so the defining statement is the
+    moment *before* the change becomes visible, not the one it shows up at."""
+    s = _session(tmp_path, accumulate, ["accumulate"])
+    first = next(m for m in s.moments if m.source == "total += v * 2")
+    s.jump_to_seq(first.seq)                     # before the first accumulation: total == 0
+    site = s.def_of("total")
+    assert site is not None
+    assert site.moment.source == "total = 0"
+    assert site.new_value == "0"
+
+    last_ret = [m for m in s.moments if m.source == "return total"][-1]
+    s.jump_to_seq(last_ret.seq)                  # after the last accumulation
+    site = s.def_of("total")
+    assert site.moment.source == "total += v * 2"
+
+
 def test_to_dict_shape(tmp_path):
     s = _session(tmp_path, accumulate, ["accumulate"])
     s.step_forward(2)
