@@ -39,10 +39,13 @@ export const api = {
   suggestTrace: (data) => apiFetch('/trace/suggest', { method: 'POST', body: JSON.stringify(data) }),
   getJob: (jobId) => apiFetch(`/job/${jobId}`),
 
-  // Trace analysis (parity with CLI: slice / reverse / replay / explain)
+  // Trace analysis (parity with CLI: slice / reverse / replay / align / explain)
   sliceTrace: (data) => apiFetch('/trace/slice', { method: 'POST', body: JSON.stringify(data) }),
   reverseTrace: (data) => apiFetch('/trace/reverse', { method: 'POST', body: JSON.stringify(data) }),
   replayTrace: (data) => apiFetch('/trace/replay', { method: 'POST', body: JSON.stringify(data) }),
+  // Two paths => side-by-side aligned cursor; three or more => trace-set curation.
+  alignTraces: (data) => apiFetch('/trace/align', { method: 'POST', body: JSON.stringify(data) }),
+  alignDistance: (data) => apiFetch('/trace/align/distance', { method: 'POST', body: JSON.stringify(data) }),
   explainTrace: (data) => apiFetch('/trace/explain', { method: 'POST', body: JSON.stringify(data) }),
 }
 

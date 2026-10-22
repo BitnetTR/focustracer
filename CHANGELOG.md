@@ -1,5 +1,56 @@
 # Changelog
 
+## [1.9.0] — 2026-08-19 — trace **set** curation + yan yana replay (FR-KIO2-03 / FR-KIO2-02)
+
+1.8.0 alignment motorunu getirdi ama iki eksik kaldı: (1) `AlignedPair` sadece
+Python API'sinden erişilebiliyordu — FR-KIO2-03'ün *"manipulation of multiple
+execution traces within a single interactive session"* maddesi CLI/GUI
+kullanıcısına ulaşmıyordu; (2) requirement'in Input'u *"a **set** of execution
+traces"* derken motor yalnızca ikili karşılaştırma yapıyordu. Bu sürüm ikisini de
+kapatır.
+
+### Added
+- **`core/align.py` — `TraceSet`**: N trace'i tek küme olarak ele alır.
+  `distance_matrix()` (simetrik, köşegen 0), `medoid()` (kümenin en temsili
+  koşusu → hizalama referansı), `outlier()` (referanstan en uzak koşu → hata
+  ararken ilk şüpheli), `align_to(reference)`, `pair(i, j)`, `summary()`.
+  `align_many(paths)` kısayolu. Tokenizasyon ve ikili hizalamalar memoize edilir,
+  böylece N×N matris her trace'i N kez değil bir kez parse eder.
+- **`Alignment.divergences()`** → `Divergence` listesi: gap'leri bitişik bölgelere
+  toplar (*"A burada 5 fazla statement çalıştırdı"*), ham çift listesinden çok daha
+  okunur bir "encoding of how traces can be aligned".
+- **`AlignedPair`** artık gerçek bir oturum: `seek(seq/event/line/at_exception)`,
+  `step(action, back)`, `step_forward/back`, `aligned_moment()`,
+  **`state_delta()`** (aynı hizalı noktada iki koşunun farklı kaydettiği
+  değişkenler), `to_dict(window)` (A + hizalı B + delta tek görünümde).
+- **CLI `align`** üç mod:
+  - `align A.xml B.xml [--show-alignment] [--divergences] [--json]` — mesafe + hizalama;
+  - `align A.xml B.xml --seq N | --at-line L | --at-exception [--step ±N] [--into|--over|--out] [--back] [--window K]` — **yan yana gezinme**: A'da imleç, B'de hizalı nokta, aradaki değer farkları;
+  - `align A.xml B.xml C.xml …` — **trace set**: mesafe matrisi, referans (medoid), outlier, ortalama mesafe.
+- **GUI**: yeni **Align sekmesi** (Analyze modal'ında) — karşılaştırılacak koşuları
+  seç, iki trace'i yan yana adımla, değer deltalarını ve diverjans bölgelerini gör;
+  3+ seçimde mesafe matrisi + referans/outlier rozetleri.
+- **GUI API**: `POST /api/trace/align` (2 trace → yan yana imleç; 3+ → küme özeti)
+  ve `POST /api/trace/align/distance`.
+- **GUI `POST /api/trace/replay`**: `step_action` (`into`/`over`/`out`) + `back` —
+  1.7.0'daki debugger stepping artık web arayüzünden de kullanılabiliyor
+  (FR-KIO2-02 GUI paritesi).
+- `tests/test_align.py`: +10 test (çoklu-trace gezinme, state delta, divergence
+  toplama, matris simetrisi/köşegeni, medoid/outlier, referansa hizalama).
+- `tests/test_gui_align.py`: HTTP yüzeyinin 8 testi (yeni dosya).
+
+### Fixed
+- **Windows konsolunda `UnicodeEncodeError`**: `replay` / `align` çıktısındaki
+  `▶`, `Δ`, `≠` karakterleri bölgesel kod sayfasında (ör. Türkçe kurulumda cp1254)
+  render sırasında çöküyordu. CLI artık stdout/stderr'i UTF-8'e ayarlıyor.
+
+### Note
+- İkili mesafe `function:line` dizisi üzerinden hesaplanır: aynı kontrol akışını
+  farklı değerlerle çalıştıran iki koşunun mesafesi **0**'dır. Değer farkı
+  `state_delta()` / GUI'deki "value deltas" ile yüzeye çıkar — mesafe *akış*
+  benzerliğini, delta *veri* farkını ölçer.
+
+
 ## [1.8.0] — 2026-08-01 — `align`: trace alignment & distance (FR-KIO2-03)
 
 Aynı programın farklı girdi/konfigürasyonlarla alınmış birden çok trace'ini

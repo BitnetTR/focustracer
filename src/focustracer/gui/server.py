@@ -28,7 +28,7 @@ from focustracer.core.recorder import TraceContext, TraceRecorder
 from focustracer.core.targeting import TargetManifest, build_code_inventory
 from focustracer.gui.settings import add_recent_project, load_settings, save_settings
 
-app = FastAPI(title="FocusTracer GUI", version="1.6.0")
+app = FastAPI(title="FocusTracer GUI", version="1.9.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -829,6 +829,8 @@ class ReplayRequest(BaseModel):
     function: str | None = None
     at_exception: bool = False
     step: int = 0
+    step_action: str | None = None   # "into" | "over" | "out" — debugger stepping
+    back: bool = False               # apply step_action backward
     window: int = 4
     def_var: str | None = None
 
@@ -865,6 +867,8 @@ def trace_replay(req: ReplayRequest) -> dict[str, Any]:
         session.step_forward(req.step)
     elif req.step < 0:
         session.step_back(-req.step)
+    if req.step_action in ("into", "over", "out"):
+        session.step(req.step_action, back=req.back)
 
     out = session.to_dict(window=req.window)
     if req.def_var:
@@ -874,6 +878,90 @@ def trace_replay(req: ReplayRequest) -> dict[str, Any]:
             "line": site.moment.line, "source": site.moment.source,
             "from": site.old_value, "to": site.new_value,
         }
+    return out
+
+
+class AlignRequest(BaseModel):
+    paths: list[str]                 # 2 → pairwise + navigation; 3+ → trace-set curation
+    # pairwise cursor controls (ignored for 3+ traces), mirroring ReplayRequest
+    seq: int | None = None
+    at_event: int | None = None
+    at_line: int | None = None
+    function: str | None = None
+    at_exception: bool = False
+    step: int = 0
+    step_action: str | None = None   # "into" | "over" | "out"
+    back: bool = False
+    window: int = 4
+    include_pairs: bool = False      # the raw pair list can be very large
+
+
+@app.post("/api/trace/align")
+def trace_align(req: AlignRequest) -> dict[str, Any]:
+    """Align traces of the same program (FR-KIO2-03).
+
+    Two traces → distance, divergence regions, and a *side-by-side cursor*: the
+    client drives a cursor on trace A exactly like ``/api/trace/replay`` and gets
+    back the aligned point in trace B plus the variables whose recorded values
+    differ. Three or more → trace-set curation: the pairwise distance matrix, the
+    medoid (reference run) and the outlier.
+
+    Stateless like the replay endpoint: each call re-derives the alignment, so
+    the client only has to keep ``seq``.
+    """
+    from focustracer.core.align import AlignedPair, TraceSet
+
+    paths = [p for p in req.paths if p]
+    if len(paths) < 2:
+        raise HTTPException(status_code=400, detail="Alignment needs at least two traces.")
+
+    try:
+        if len(paths) > 2:
+            summary = TraceSet(paths).summary()
+            return {"mode": "set", **summary.to_dict()}
+
+        pair = AlignedPair(paths[0], paths[1])
+        pair.seek(
+            seq=req.seq, event=req.at_event, line=req.at_line,
+            function=req.function, at_exception=req.at_exception,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=_criterion_hint(exc))
+
+    if req.step > 0:
+        pair.step_forward(req.step)
+    elif req.step < 0:
+        pair.step_back(-req.step)
+    if req.step_action in ("into", "over", "out"):
+        pair.step(req.step_action, back=req.back)
+
+    out = pair.to_dict(window=req.window)
+    out["mode"] = "pair"
+    out["paths"] = paths
+    out["divergences"] = [d.to_dict() for d in pair.alignment.divergences()]
+    if req.include_pairs:
+        out["alignment"] = pair.alignment.to_dict(include_pairs=True)
+    return out
+
+
+@app.post("/api/trace/align/distance")
+def trace_align_distance(req: AlignRequest) -> dict[str, Any]:
+    """Just the distance + alignment summary for two traces (no reconstruction view)."""
+    paths = [p for p in req.paths if p]
+    if len(paths) != 2:
+        raise HTTPException(status_code=400, detail="Distance compares exactly two traces.")
+    from focustracer.core.align import align_traces
+
+    try:
+        al = align_traces(paths[0], paths[1])
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=_criterion_hint(exc))
+    out = al.to_dict(include_pairs=req.include_pairs)
+    out["divergences"] = [d.to_dict() for d in al.divergences()]
     return out
 
 

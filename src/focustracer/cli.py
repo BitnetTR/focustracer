@@ -403,17 +403,63 @@ def create_parser() -> argparse.ArgumentParser:
     # ---------------------------------------------------------------- align
     align_parser = subparsers.add_parser(
         "align",
-        help="Align two traces of the same program and report their distance",
+        help="Align traces of the same program: distance, divergences, side-by-side replay",
     )
-    align_parser.add_argument("trace_a", help="First trace XML file")
-    align_parser.add_argument("trace_b", help="Second trace XML file")
+    align_parser.add_argument(
+        "traces", nargs="+", metavar="TRACE",
+        help="Two traces to align, or 3+ to curate them as a trace set",
+    )
     align_parser.add_argument(
         "--show-alignment", action="store_true",
         help="Print the aligned statement pairs (matches and gaps)",
     )
     align_parser.add_argument(
+        "--divergences", action="store_true",
+        help="Print the divergence regions (contiguous runs of gaps)",
+    )
+    align_parser.add_argument(
         "--json", default=None, metavar="PATH",
-        help="Write the alignment (distance + pairs) to a JSON sidecar",
+        help="Write the alignment / trace-set summary to a JSON sidecar",
+    )
+    # -- side-by-side navigation: move a cursor on A, read the aligned B ----
+    align_nav = align_parser.add_argument_group(
+        "side-by-side navigation",
+        "Move a cursor through trace A and read the aligned point in trace B "
+        "(two traces only). Mirrors the `replay` start-point and step options.",
+    )
+    align_nav.add_argument(
+        "--seq", type=int, default=None, metavar="N",
+        help="Start A's cursor at timeline index N",
+    )
+    align_nav.add_argument(
+        "--at-event", type=int, default=None, metavar="ID",
+        help="Start A's cursor at line event ID",
+    )
+    align_nav.add_argument(
+        "--at-line", type=int, default=None, metavar="LINE",
+        help="Start A's cursor at a source line",
+    )
+    align_nav.add_argument(
+        "--at-exception", action="store_true",
+        help="Start A's cursor at the crash",
+    )
+    align_nav.add_argument(
+        "--function", default=None, help="Disambiguate --at-line by function",
+    )
+    align_nav.add_argument(
+        "--step", type=int, default=0, metavar="N",
+        help="Move N steps from the start point: +N forward, -N backward",
+    )
+    align_step = align_nav.add_mutually_exclusive_group()
+    align_step.add_argument("--into", action="store_true", help="Debugger step into on A")
+    align_step.add_argument("--over", action="store_true", help="Debugger step over on A")
+    align_step.add_argument("--out", action="store_true", help="Debugger step out on A")
+    align_nav.add_argument(
+        "--back", action="store_true", help="Apply --into/--over/--out backward",
+    )
+    align_nav.add_argument(
+        "--window", type=int, default=3, metavar="K",
+        help="Neighbour line-events to show around each cursor (default 3)",
     )
 
     return parser
@@ -1481,12 +1527,159 @@ def replay_cmd(args: argparse.Namespace) -> int:
     return 0
 
 
-def align_cmd(args: argparse.Namespace) -> int:
-    """Align two traces of the same program and report their distance."""
-    from focustracer.core.align import align_traces
+def _align_nav_requested(args: argparse.Namespace) -> bool:
+    """True when the user asked for side-by-side cursor navigation."""
+    return (
+        args.seq is not None
+        or args.at_event is not None
+        or args.at_line is not None
+        or args.at_exception
+        or bool(args.step)
+        or args.into
+        or args.over
+        or args.out
+    )
+
+
+def _align_set_cmd(args: argparse.Namespace) -> int:
+    """3+ traces: curate them as a set (distance matrix, reference, outlier)."""
+    from focustracer.core.align import TraceSet
 
     try:
-        al = align_traces(args.trace_a, args.trace_b)
+        summary = TraceSet(args.traces).summary()
+    except FileNotFoundError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"[!] Align failed: {exc}", file=sys.stderr)
+        return 1
+
+    n = len(summary.paths)
+    print(f"[*] Trace set — {n} traces of the same program")
+    for i, (path, length) in enumerate(zip(summary.paths, summary.lengths)):
+        print(f"    #{i}  {length:>6} statements   {Path(path).name}")
+    print("-" * 60)
+    print("[*] Pairwise normalized distance (0 = identical):")
+    print("        " + "".join(f"   #{j:<4}" for j in range(n)))
+    for i, row in enumerate(summary.matrix):
+        print(f"    #{i:<3}" + "".join(f"  {v:>6.3f}" for v in row))
+    print("-" * 60)
+    ref, out = summary.reference, summary.outlier
+    print(f"[*] Reference (medoid): #{ref}  {Path(summary.paths[ref]).name}"
+          "   ← most representative run")
+    print(f"[*] Outlier:            #{out}  {Path(summary.paths[out]).name}"
+          f"   ← furthest from the reference ({summary.matrix[ref][out]:.3f})")
+    print(f"[*] Mean pairwise distance: {summary.mean_distance:.3f}")
+    print("-" * 60)
+
+    if args.json:
+        Path(args.json).write_text(
+            json.dumps(summary.to_dict(), indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        print(f"[*] Trace-set summary written to {args.json}", file=sys.stderr)
+    return 0
+
+
+def _align_nav_cmd(args: argparse.Namespace, trace_a: str, trace_b: str) -> int:
+    """Two traces, side by side: one cursor on A, the aligned point in B."""
+    from focustracer.core.align import AlignedPair
+
+    try:
+        pair = AlignedPair(trace_a, trace_b)
+        pair.seek(
+            seq=args.seq, event=args.at_event, line=args.at_line,
+            function=args.function, at_exception=args.at_exception,
+        )
+    except FileNotFoundError as exc:
+        print(f"[!] {exc}", file=sys.stderr)
+        return 1
+    except ValueError as exc:
+        print(f"[!] Align failed: {exc}", file=sys.stderr)
+        return 1
+
+    if args.step > 0:
+        pair.step_forward(args.step)
+    elif args.step < 0:
+        pair.step_back(-args.step)
+    if args.into:
+        pair.step("into", back=args.back)
+    elif args.over:
+        pair.step("over", back=args.back)
+    elif args.out:
+        pair.step("out", back=args.back)
+
+    al = pair.alignment
+    print(f"[*] A: {Path(trace_a).name}   B: {Path(trace_b).name}")
+    print(f"[*] Distance: {al.distance}  (normalized {al.normalized_distance:.3f})   "
+          f"matched {al.matched} · gaps {al.gaps}")
+    print("-" * 60)
+    am = pair.a.current
+    print(f"    A #{pair.a.cursor}/{pair.a.total - 1}  {am.function} L{am.line}: {am.source}")
+    bm = pair.aligned_moment()
+    if bm is None:
+        print("    B  —      diverged: no statement in B aligns with A's cursor")
+    else:
+        print(f"    B #{bm.seq}/{pair.b.total - 1}  {bm.function} L{bm.line}: {bm.source}")
+    print("-" * 60)
+
+    if bm is not None:
+        delta = pair.state_delta()
+        if not delta:
+            print("    (states agree at this point)")
+        else:
+            print("    Variable deltas at the aligned point:")
+            for d in delta:
+                print(f"      {d['name']:<16} A = {str(d['a']):<20} B = {d['b']}")
+        print("-" * 60)
+
+    if args.window > 0:
+        view = pair.to_dict(window=args.window)
+        for side in ("a", "b"):
+            sub = view[side]
+            if sub is None:
+                continue
+            print(f"Timeline around {side.upper()}'s cursor:")
+            for entry in sub["timeline"]:
+                mark = "▶" if entry["is_cursor"] else " "
+                print(f"  {mark} #{entry['seq']:<4} {entry['function']} "
+                      f"L{entry['line']}: {entry['source']}")
+        print("-" * 60)
+
+    if args.json:
+        Path(args.json).write_text(
+            json.dumps(pair.to_dict(window=args.window), indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+        print(f"[*] Aligned cursor view written to {args.json}", file=sys.stderr)
+    return 0
+
+
+def align_cmd(args: argparse.Namespace) -> int:
+    """Align traces of the same program and report their distance.
+
+    Three modes, all FR-KIO2-03:
+      * 2 traces               → distance + alignment encoding (the Output);
+      * 2 traces + navigation  → one session over both at once (the Objective);
+      * 3+ traces              → trace-set curation (the Input).
+    """
+    from focustracer.core.align import align_traces
+
+    if len(args.traces) < 2:
+        print("[!] align needs at least two traces.", file=sys.stderr)
+        return 1
+    if len(args.traces) > 2:
+        if _align_nav_requested(args):
+            print("[!] Side-by-side navigation works on exactly two traces.", file=sys.stderr)
+            return 1
+        return _align_set_cmd(args)
+
+    trace_a, trace_b = args.traces
+    if _align_nav_requested(args):
+        return _align_nav_cmd(args, trace_a, trace_b)
+
+    try:
+        al = align_traces(trace_a, trace_b)
     except FileNotFoundError as exc:
         print(f"[!] {exc}", file=sys.stderr)
         return 1
@@ -1502,8 +1695,8 @@ def align_cmd(args: argparse.Namespace) -> int:
     print("-" * 60)
 
     if args.show_alignment:
-        a_tok = _align_tokens(args.trace_a)
-        b_tok = _align_tokens(args.trace_b)
+        a_tok = _align_tokens(trace_a)
+        b_tok = _align_tokens(trace_b)
         for ai, bj in al.pairs:
             if ai is not None and bj is not None:
                 mark = "=" if a_tok[ai] == b_tok[bj] else "≠"
@@ -1514,9 +1707,23 @@ def align_cmd(args: argparse.Namespace) -> int:
                 print(f"  + {'':<24} {b_tok[bj]}  (only in B)")
         print("-" * 60)
 
+    if args.divergences:
+        divs = al.divergences()
+        if not divs:
+            print("[*] No divergences — the traces align 1:1.")
+        for d in divs:
+            where = "A" if d.side == "a" else "B"
+            other = "B" if d.side == "a" else "A"
+            anchor = f"after {other} #{d.at}" if d.at is not None else "at the start"
+            print(f"  {where} #{d.start}..{d.end - 1}  "
+                  f"({d.length} statement(s) only in {where}, {anchor})")
+        print("-" * 60)
+
     if args.json:
+        payload = al.to_dict()
+        payload["divergences"] = [d.to_dict() for d in al.divergences()]
         Path(args.json).write_text(
-            json.dumps(al.to_dict(), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+            json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
         )
         print(f"[*] Alignment written to {args.json}", file=sys.stderr)
     return 0
@@ -1556,7 +1763,23 @@ def launch_gui(args: argparse.Namespace) -> int:
     return 0
 
 
+def _force_utf8_output() -> None:
+    """Make the CLI's box-drawing / arrow output survive a legacy console codepage.
+
+    The trace views use ``▶``, ``Δ``, ``≠`` and friends. On Windows the console
+    still defaults to a regional codepage (cp1254 on a Turkish install), which
+    raises ``UnicodeEncodeError`` mid-render. Re-encoding as UTF-8 with a
+    replacement fallback keeps the output readable instead of crashing.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")  # type: ignore[union-attr]
+        except (AttributeError, ValueError, OSError):
+            pass  # already UTF-8, or a stream that cannot be reconfigured
+
+
 def main(argv: Optional[list[str]] = None) -> int:
+    _force_utf8_output()
     parser = create_parser()
     args = parser.parse_args(argv)
 

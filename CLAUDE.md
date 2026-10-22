@@ -83,6 +83,14 @@ npm run dev     # dev server
 
 - **`replay.py` — `ReplaySession`**: Interactive replay — a movable cursor over the reconstructed timeline (`step_forward`/`step_back`/`jump_to_*`/`state`/`def_of`/`to_dict`). Reuses `reverse.Reconstructor`. Read-only. Realises FR-KIO2-02 (forward/backward navigation with state inspection).
 
+- **`align.py` — `TraceSet` / `AlignedPair`**: Trace alignment (Needleman-Wunsch over the executed
+  `function:line` sequences). `align_traces`/`trace_distance` give the pairwise distance (0 for identical
+  runs) and `Alignment.divergences()` collapses the gaps into readable regions. `AlignedPair` is a
+  two-trace session: drive a cursor on A (`seek`/`step`) and read the aligned point, state and
+  `state_delta()` in B. `TraceSet` holds N traces — distance matrix, medoid (reference run) and outlier.
+  Realises FR-KIO2-03. Note: the distance measures *control flow*; runs that differ only in values have
+  distance 0 and surface through `state_delta()`.
+
 - **`loader.py` — `TraceLoader`/`TraceDocument`**: Parses a saved trace XML into an in-memory document consumed by slicer/reverse/replay.
 
 ### AI Agent Layer (`src/focustracer/agent/`)
