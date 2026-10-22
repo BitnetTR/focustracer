@@ -1,6 +1,6 @@
 Metadata-Version: 2.4
 Name: focustracer
-Version: 1.5.0
+Version: 1.6.0
 Summary: FocusTracer - LLM-guided dynamic trace log capture and debugging tool
 Author-email: Yasin <yasin0.unal@gmail.com>
 License: MIT
@@ -256,7 +256,9 @@ Realises FR-KIO2-02 (forward/backward navigation with state inspection).
 
 > **GUI parity:** `slice`, `explain`, `reverse`, and `replay` are all available
 > from the web UI too — open any trace under **Trace Logs** and use the
-> **Slice / Reverse / Replay / Explain** tabs. Launch with `focustracer gui`.
+> **Slice / Reverse / Replay / Explain** tabs. You can also pull Ollama models
+> from **Settings › AI Agent › Models** with live progress. Launch with
+> `focustracer gui`.
 
 ## Using Local Ollama Reliably
 

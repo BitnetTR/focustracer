@@ -8,14 +8,14 @@ version = "1.8.0"
 description = "FocusTracer - LLM-guided dynamic trace log capture and debugging tool"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 authors = [
     {name = "Yasin", email = "yasin0.unal@gmail.com"}
 ]
 keywords = ["debugging", "trace", "llm", "ai", "fastapi"]
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
 ]
 dependencies = [

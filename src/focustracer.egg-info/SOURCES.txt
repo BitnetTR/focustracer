@@ -34,7 +34,10 @@ src/focustracer/gui/frontend/dist/index.html
 src/focustracer/gui/frontend/dist/testwrite
 src/focustracer/gui/frontend/dist/assets/index-BdYYZ8Xt.css
 src/focustracer/gui/frontend/dist/assets/index-CLnJtgrZ.js
+src/focustracer/gui/frontend/dist/assets/index-CWxRxar4.js
+src/focustracer/gui/frontend/dist/assets/index-DwF1wJKL.js
 src/focustracer/gui/frontend/dist/assets/index-DyjGEtG-.js
+src/focustracer/gui/frontend/dist/assets/index-XGwjnE8t.css
 src/focustracer/gui/frontend/dist/assets/index-iBRINwpP.css
 src/focustracer/schema/trace_schema.json
 src/focustracer/schema/trace_schema_v1.xsd

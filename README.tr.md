@@ -4,11 +4,34 @@ FocusTracer, Python projelerinde belirli fonksiyonlara odaklanarak XML trace ür
 
 ## 1. Kurulum
 
-Proje kökünde:
+Python **3.10+** gerekir. FocusTracer PyPI'da yok; doğrudan GitHub'dan kurulur:
 
 ```bash
+pip install "git+https://github.com/BitnetTR/focustracer.git"
+```
+
+Belirli bir branch, tag veya commit'e sabitlemek için `@<ref>` ekleyin:
+
+```bash
+pip install "git+https://github.com/BitnetTR/focustracer.git@master"
+```
+
+Başka bir projenin bağımlılığı olarak (`requirements.txt` / `pyproject.toml`):
+
+```text
+focustracer @ git+https://github.com/BitnetTR/focustracer.git@master
+```
+
+Kaynağı düzenleyerek geliştirmek için (yerel klon, editable kurulum):
+
+```bash
+git clone https://github.com/BitnetTR/focustracer.git
+cd focustracer
 pip install -e .
 ```
+
+SSH ile kurulum, git'ten doğrudan editable kurulum, güncelleme ve sorun giderme için:
+[docs/installation.md](./docs/installation.md). Tüm CLI parametreleri: [docs/cli.md](./docs/cli.md).
 
 Kurulumdan sonra CLI şu şekilde çalışır:
 
@@ -197,7 +220,7 @@ Bu durumda:
 - `--error-context`: hata mesajı veya log bağlamı
 - `--output`: XML çıktı dosyası
 - `--output-dir`: varsayılan çıktı klasörü
-- `--schema-version`: varsayılan `2.1`
+- `--schema-version`: varsayılan `2.3`
 - `--detail`: `minimal`, `normal`, `detailed`
 - `--max-depth`: maksimum çağrı derinliği
 - `--max-iterations`: XML’e yazılacak loop iterasyonu sayısını sınırlar
